@@ -1,6 +1,7 @@
 #NoTrayIcon
 
 If $CmdLine[0]==7 Then
+   Global $rect = DllStructCreate('long x1;long y1;long x2;long y2;');
    Child($CmdLine)
 Else
    If IsAdmin() Then Sleep(100)
@@ -174,7 +175,6 @@ Func WM_INPUT($h,$m,$w,$l)
      Local Static $raw = DllStructCreate($MOU)
      Local Static $size = DllStructGetSize($raw)
      Local Static $headsize = DllStructGetSize(DllStructCreate($HEAD))
-     Local Static $rect = DllStructCreate('long x1;long y1;long x2;long y2;')
      DllCall ( $user32dll,'uint','GetRawInputData','handle',$l,'uint',0x10000003,'struct*',$raw,'uint*',$size,'uint',$headsize)
      If $raw.hDevice Then
         If $raw.ButtonFlags Then
@@ -240,6 +240,7 @@ Func Tick($ticks)
         $g_scrollVel[1] += $deltaY*$g_sensitivity_y
         $g_scrollAccu[0] -= $deltaX
         $g_scrollAccu[1] -= $deltaY
+        DllCall($user32dll,'bool','ClipCursor','struct*',$rect)
      Else
         If $g_flickMode Then 
            $g_scrollAccu[0]=0
