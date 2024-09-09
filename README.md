@@ -51,6 +51,6 @@ This kills and restarts the worker process with the new configuration.
 
 ## As TPMiddle replacement on modern ThinkPads
 
-The following configurations are recommended to emulate TPmiddle's direct scrolling:
+With your TrackPoint's middle button set to "middle click mode", the following configurations are recommended to emulate TPmiddle's direct scrolling:
 
 ![image](https://github.com/user-attachments/assets/1d076279-9b22-45a4-bd0b-a54cc9e2e1d9)
