@@ -14,7 +14,6 @@ https://github.com/EsportToys/LibreScroll/assets/98432183/c7fc05a5-6b10-4b91-998
 ## Options
 ![image](https://github.com/EsportToys/LibreScroll/assets/98432183/2bd2ac5a-e8e7-43ec-a52d-abef302f2bab)
 
-
 ### Friction
 The rate at which momentum decays.
 
@@ -49,3 +48,9 @@ This kills the worker process, which can be restarted by clicking Unpause or App
 After modifying the preference, click this to apply the configuration as displayed.
 
 This kills and restarts the worker process with the new configuration.
+
+## As TPMiddle replacement on modern ThinkPads
+
+The following configurations are recommended to emulate TPmiddle's direct scrolling:
+
+![image](https://github.com/user-attachments/assets/1d076279-9b22-45a4-bd0b-a54cc9e2e1d9)
