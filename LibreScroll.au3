@@ -220,12 +220,12 @@ Func CancelStruct()
      Local $ptr = DllStructGetPtr($arr)
      Local $struct = DllStructCreate('dword;struct;word;word;dword;dword;ulong_ptr;endstruct;byte[8]',$ptr)
      DllStructSetData($struct,1,1)
-     DllStructSetData($struct,2,0x03)
+     ;DllStructSetData($struct,2,0x03)
      DllStructSetData($struct,3,DllCall($user32dll,'uint','MapVirtualKey','uint',0x03,'uint',0)[0])
      DllStructSetData($struct,4,0)
      Local $struct = DllStructCreate('dword;struct;word;word;dword;dword;ulong_ptr;endstruct;byte[8]',$ptr+$SIZE)
      DllStructSetData($struct,1,1)
-     DllStructSetData($struct,2,0x03)
+     ;DllStructSetData($struct,2,0x03)
      DllStructSetData($struct,3,DllCall($user32dll,'uint','MapVirtualKey','uint',0x03,'uint',0)[0])
      DllStructSetData($struct,4,2)
      Return $arr
@@ -240,12 +240,16 @@ Func Tick($ticks)
         $g_scrollVel[1] += $deltaY*$g_sensitivity_y
         $g_scrollAccu[0] -= $deltaX
         $g_scrollAccu[1] -= $deltaY
-        DllCall($user32dll,'bool','ClipCursor','struct*',$rect)
+        Local $current_rect = DllStructCreate('long x1;long y1;long x2;long y2;');
+        DllCall($user32dll,'bool','GetClipCursor','struct*',$current_rect)
+        If $current_rect.x1 <> $rect.x1 or $current_rect.x2 <> $rect.x2 or $current_rect.y1 <> $rect.y1 or $current_rect.y2 <> $rect.y2 Then
+           DllCall($user32dll,'bool','ClipCursor','struct*',$rect)
+        EndIf
      Else
         If $g_flickMode Then 
            $g_scrollAccu[0]=0
            $g_scrollAccu[1]=0
-        Else 
+        Else
            Return
         EndIf
      EndIf
