@@ -60,3 +60,12 @@ With your TrackPoint's middle button set to "middle click mode", the following c
 
 ![image](https://github.com/user-attachments/assets/6a0ee926-d331-4481-8f6e-a5f6f2a01c94)
 
+```
+Friction: 30
+Y-Sensitivity: 90
+X-Sensitivity: 90
+Minimum X-Step: 10
+Minimum Y-Step: 10
+Flick Mode: No
+ThinkPad Mode: Yes
+```
