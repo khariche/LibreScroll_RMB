@@ -148,6 +148,7 @@ Func Child($args)
      Global $g_scrollVel = [0,0]
      Global $g_scrollAccu = [0,0]
      Global $g_trigger_isDown = False
+     Global $g_cancel_pending = False
      Local $_ = DllStructCreate('ushort page;ushort usage;dword flags;hwnd target')
      Local $size = DllStructGetSize($_)
      $_.page = 1
@@ -180,18 +181,19 @@ Func WM_INPUT($h,$m,$w,$l)
         If $raw.ButtonFlags Then
            If BitAnd(32,$raw.ButtonFlags) Then
               $g_trigger_isDown = False
+              $g_cancel_pending = False
               If Not $g_flickMode Then
                  $g_scrollVel[0] = 0
                  $g_scrollVel[1] = 0
               EndIf
               DllCall($user32dll,'bool','ClipCursor','struct*',Null)
            ElseIf BitAnd(16,$raw.ButtonFlags) Then
-              SendCancel()
               $g_scrollAccu[0] = 0
               $g_scrollAccu[1] = 0
               $g_scrollVel[0] = 0
               $g_scrollVel[1] = 0
               $g_trigger_isDown = True
+              $g_cancel_pending = True
               DllCall($user32dll,'bool','GetCursorPos','struct*',$rect)
               $rect.x2 = $rect.x1 + 1
               $rect.y2 = $rect.y1 + 1
@@ -280,7 +282,13 @@ Func SendScroll($deltaX,$deltaY)
         $sendY = $multipleY*$g_threshold_y
         $residue[1] -= $sendY
      EndIf
-     If $sendX<>0 or $sendY<>0 Then ScrollMouseXY($sendX,$sendY)
+     If $sendX<>0 or $sendY<>0 Then 
+        If $g_cancel_pending Then 
+           $g_cancel_pending = False
+           SendCancel()
+        EndIf
+        ScrollMouseXY($sendX,$sendY)
+     EndIf
 EndFunc
 
 Func ScrollMouseXY($dx,$dy)
