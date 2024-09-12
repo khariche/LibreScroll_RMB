@@ -12,7 +12,8 @@ https://github.com/EsportToys/LibreScroll/assets/98432183/c7fc05a5-6b10-4b91-998
 3. Release middle-mouse-button to halt scroll momentum and release the cursor.
 
 ## Options
-![image](https://github.com/EsportToys/LibreScroll/assets/98432183/2bd2ac5a-e8e7-43ec-a52d-abef302f2bab)
+
+![image](https://github.com/user-attachments/assets/b34945cb-b8d9-42f5-8646-02ebc7aa978a)
 
 ### Friction
 The rate at which momentum decays.
@@ -33,11 +34,15 @@ This is a workaround for some legacy apps that do not handle smooth scrolling in
 
 A "standard" coarse scrollwheel step is 120, and the smallest step is 1.
 
-
 ### Flick Mode
 When enabled, releasing middle-mouse-button will not stop the scrolling momentum. 
 
 Press any button again (or move the actual wheel) to stop the momentum.
+
+### ThinkPad Mode
+When enabled, scrolling snaps to either horizontal or vertical, never both at the same time.
+
+This emulates how scrolling works on ThinkPad TrackPoints.
 
 ### Pause/Unpause
 Temporarily disable the utility if you need to use the unmodified behavior in another app.
@@ -49,8 +54,9 @@ After modifying the preference, click this to apply the configuration as display
 
 This kills and restarts the worker process with the new configuration.
 
-## As TPMiddle replacement on modern ThinkPads
+## Recommended Settings for ThinkPad users (replaceing TPmiddle)
 
 With your TrackPoint's middle button set to "middle click mode", the following configurations are recommended to emulate TPmiddle's direct scrolling:
 
-![image](https://github.com/user-attachments/assets/1d076279-9b22-45a4-bd0b-a54cc9e2e1d9)
+![image](https://github.com/user-attachments/assets/6a0ee926-d331-4481-8f6e-a5f6f2a01c94)
+
