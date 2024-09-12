@@ -54,7 +54,7 @@ After modifying the preference, click this to apply the configuration as display
 
 This kills and restarts the worker process with the new configuration.
 
-## Recommended Settings for ThinkPad users (replaceing TPmiddle)
+## Recommended Settings for ThinkPad users (replacing TPmiddle)
 
 With your TrackPoint's middle button set to "middle click mode", the following configurations are recommended to emulate TPmiddle's direct scrolling:
 
