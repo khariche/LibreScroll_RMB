@@ -17,7 +17,7 @@ Func Parent()
      TrayItemSetOnEvent(TrayCreateItem('About LibreScroll'),Info)
      TrayItemSetOnEvent(TrayCreateItem('Options'),Unhide)
      TrayItemSetOnEvent(TrayCreateItem('Quit'),Quit)
-     Global $g_hWnd = GUICreate('LibreScroll options',215,185,Default,Default,0x00C80000)
+     Global $g_hWnd = GUICreate('LibreScroll options',215,210,Default,Default,0x00C80000)
      GUISetIcon('main.cpl',608)
      TraySetOnEvent(-7,Unhide)
      TraySetOnEvent(-11,UpdateTip)
@@ -35,21 +35,24 @@ Func Parent()
      Local $stepX = GUICtrlCreateInput(IniRead('options.ini','LibreScroll','stepX',1) , 110 ,105 , 100 , 20)
      Local $flick = GUICtrlCreateCheckbox('Flick mode',110,130)
                     GUICtrlSetState( $flick , 1=IniRead('options.ini','LibreScroll','flick',0) ? 1 : 4 )
-     Local $pause = GUICtrlCreateButton('Pause',  5,155,100)
-     Local $apply = GUICtrlCreateButton('Apply',110,155,100)
+     Local $think = GUICtrlCreateCheckbox('ThinkPad mode',110,155)
+                    GUICtrlSetState( $think , 1=IniRead('options.ini','LibreScroll','think',0) ? 1 : 4 )
+     Local $pause = GUICtrlCreateButton('Pause',  5,180,100)
+     Local $apply = GUICtrlCreateButton('Apply',110,180,100)
      GUICtrlSetTip($decay,'How quickly the momentum decays, by applying a drag force that is proportional to speed.')
      GUICtrlSetTip($sensY,'Vertical scrolling sensitivity. Set a negative number for reverse scrolling.')
      GUICtrlSetTip($sensX,'Horizontal scrolling sensitivity. Set a negative number for reverse scrolling.')
      GUICtrlSetTip($stepY,'How many scroll counts to accumulate before sending.' & @CRLF & 'A regular coarse scroll step is 120.')
      GUICtrlSetTip($stepX,'How many scroll counts to accumulate before sending.' & @CRLF & 'A regular coarse scroll step is 120.')
      GUICtrlSetTip($flick,'Continue scrolling even after mouse3 is released.' & @CRLF & 'The momentum can be reset by clicking any button or moving the wheel.')
+     GUICtrlSetTip($think,'Emulate how ThinkPad TrackPoint scrolling works.' & @CRLF & 'Only X or Y scrolling is sent at any given time.')
      Local $str = ''
      $str &= Number(GUICtrlRead($sensX)) & ' '
      $str &= Number(GUICtrlRead($sensY)) & ' '
      $str &= Number(GUICtrlRead($decay)) & ' '
      $str &= Round(GUICtrlRead($stepX)) & ' '
      $str &= Round(GUICtrlRead($stepY)) & ' '
-     $str &= Number(1=GUICtrlRead($flick)) & ' '
+     $str &= Number((1=GUICtrlRead($flick)) + (1=GUICtrlRead($think))*2) & ' '
      StartChild($str)
      While 1
         Local $id = GUIGetMsg()
@@ -72,6 +75,7 @@ Func Parent()
                   GUICtrlSetData($id,Round($value))
                EndIf
           Case $flick
+          Case $think
           Case $apply,$pause 
                If $id==$pause And GUICtrlRead($pause)=='Pause' Then 
                   CloseChild()
@@ -83,7 +87,7 @@ Func Parent()
                      Number(GUICtrlRead($decay))   , _
                      Round(GUICtrlRead($stepX))    , _
                      Round(GUICtrlRead($stepY))    , _
-                     Number(1=GUICtrlRead($flick)) _
+                     Number((1=GUICtrlRead($flick)) + (1=GUICtrlRead($think))*2) _
                   ]
                   Local $str = $arr[0] & ' ' & $arr[1] & ' ' & $arr[2] & ' ' & $arr[3] & ' ' & $arr[4] & ' ' & $arr[5]
                   RestartChild($str)
@@ -93,7 +97,8 @@ Func Parent()
                   IniWrite('options.ini','LibreScroll','decay',$arr[2])
                   IniWrite('options.ini','LibreScroll','stepX',$arr[3])
                   IniWrite('options.ini','LibreScroll','stepY',$arr[4])
-                  IniWrite('options.ini','LibreScroll','flick',$arr[5])
+                  IniWrite('options.ini','LibreScroll','flick',BitAnd(1,$arr[5]) ? 1 : 0)
+                  IniWrite('options.ini','LibreScroll','think',BitAnd(2,$arr[5]) ? 1 : 0)
                EndIf
         EndSwitch
      WEnd
@@ -106,7 +111,7 @@ Func UpdateTip()
      TraySetToolTip('LibreScroll - ' & ( ProcessExists($g_childPID) ? 'Active' : 'Inactive') )
 EndFunc
 Func Info()
-     MsgBox(0,'About LibreScroll v1.0.2','Visit https://github.com/EsportToys/LibreScroll for more info.')
+     MsgBox(0,'About LibreScroll v1.2','Visit https://github.com/EsportToys/LibreScroll for more info.')
 EndFunc
 Func Elevate()
      CloseChild()
@@ -141,7 +146,8 @@ Func Child($args)
      Global $g_damping = $args[4]>0 ? $args[4] : 3
      Global $g_threshold_x = $args[5]>1 ? $args[5] : 1
      Global $g_threshold_y = $args[6]>1 ? $args[6] : 1
-     Global $g_flickMode = 1=$args[7] ? True : False
+     Global $g_flickMode = BitAnd(1,Number($args[7])) ? True : False
+     Global $g_thinkMode = BitAnd(2,Number($args[7])) ? True : False
 
      Global Const $user32dll = DllOpen('user32.dll')
      Global Const $kernel32dll = DllOpen('kernel32.dll')
@@ -236,7 +242,7 @@ EndFunc
 Func Tick($ticks)
      Local Static $qpf = DllCall($kernel32dll,'bool','QueryPerformanceFrequency','int64*',Null)[1]
      Local Static $current_rect = DllStructCreate('long x1;long y1;long x2;long y2;');
-     If $g_trigger_isDown Then 
+     If $g_trigger_isDown Then
         DllCall($user32dll,'bool','GetClipCursor','struct*',$current_rect)
         If $current_rect.x1 <> $rect.x1 or $current_rect.x2 <> $rect.x2 or $current_rect.y1 <> $rect.y1 or $current_rect.y2 <> $rect.y2 Then
            DllCall($user32dll,'bool','ClipCursor','struct*',$rect)
@@ -281,6 +287,15 @@ Func SendScroll($deltaX,$deltaY)
      If $multipleY<>0 Then
         $sendY = $multipleY*$g_threshold_y
         $residue[1] -= $sendY
+     EndIf
+     If $g_thinkMode Then 
+        If Abs($sendX) > Abs($sendY) Then 
+           $sendY = 0
+           $residue[1] = 0
+        Else 
+           $sendX = 0
+           $residue[0] = 0
+        EndIf
      EndIf
      If $sendX<>0 or $sendY<>0 Then 
         If $g_cancel_pending Then 
