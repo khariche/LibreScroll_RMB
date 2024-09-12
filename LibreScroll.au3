@@ -235,18 +235,18 @@ EndFunc
 
 Func Tick($ticks)
      Local Static $qpf = DllCall($kernel32dll,'bool','QueryPerformanceFrequency','int64*',Null)[1]
+     Local Static $current_rect = DllStructCreate('long x1;long y1;long x2;long y2;');
      If $g_trigger_isDown Then 
+        DllCall($user32dll,'bool','GetClipCursor','struct*',$current_rect)
+        If $current_rect.x1 <> $rect.x1 or $current_rect.x2 <> $rect.x2 or $current_rect.y1 <> $rect.y1 or $current_rect.y2 <> $rect.y2 Then
+           DllCall($user32dll,'bool','ClipCursor','struct*',$rect)
+        EndIf
         Local $deltaX = $g_scrollAccu[0]
         Local $deltaY = $g_scrollAccu[1]
         $g_scrollVel[0] += $deltaX*$g_sensitivity_x
         $g_scrollVel[1] += $deltaY*$g_sensitivity_y
         $g_scrollAccu[0] -= $deltaX
         $g_scrollAccu[1] -= $deltaY
-        Local $current_rect = DllStructCreate('long x1;long y1;long x2;long y2;');
-        DllCall($user32dll,'bool','GetClipCursor','struct*',$current_rect)
-        If $current_rect.x1 <> $rect.x1 or $current_rect.x2 <> $rect.x2 or $current_rect.y1 <> $rect.y1 or $current_rect.y2 <> $rect.y2 Then
-           DllCall($user32dll,'bool','ClipCursor','struct*',$rect)
-        EndIf
      Else
         If $g_flickMode Then 
            $g_scrollAccu[0]=0
