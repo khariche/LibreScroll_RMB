@@ -5,7 +5,7 @@ If $CmdLine[0]==7 Then
    Child($CmdLine)
 Else
    If IsAdmin() Then Sleep(100)
-   DllCall("kernel32.dll", "handle", "CreateMutexW", "struct*", 0, "bool", 1, "wstr", "TPMouse")
+   DllCall("kernel32.dll", "handle", "CreateMutexW", "struct*", 0, "bool", 1, "wstr", "LibreScroll")
    If 183 = DllCall("kernel32.dll", "dword", "GetLastError")[0] Then Exit
    Parent()
 EndIf
