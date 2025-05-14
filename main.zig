@@ -98,7 +98,7 @@ fn trayProc(hwnd: win.HWND, uMsg: u32, wParam: usize, lParam: isize) callconv(.w
             });
             if (GetDlgItem(hwnd, 104)) |hPause| {
                 _ = SetWindowTextA(hPause, "Unpause");
-                _ = SetWindowLongPtrA(hPause, -12, 105);
+                _ = SetWindowLongA(hPause, -12, 105);
             }
             if (raw_thread_pending_restart) {
                 raw_thread_pending_restart = false;
@@ -115,7 +115,7 @@ fn trayProc(hwnd: win.HWND, uMsg: u32, wParam: usize, lParam: isize) callconv(.w
             });
             if (GetDlgItem(hwnd, 105)) |hUnpause| {
                 _ = SetWindowTextA(hUnpause, "Pause");
-                _ = SetWindowLongPtrA(hUnpause, -12, 104);
+                _ = SetWindowLongA(hUnpause, -12, 104);
             }
         },
     }
@@ -131,8 +131,8 @@ fn onWmCommand(hwnd: win.HWND, wParam: usize, lParam: isize) void {
     switch (id) {
         else => {},
         100 => quit(),
-        101 => config(),
-        102 => about(hwnd),
+        101 => show(hwnd),
+        102 => info(hwnd),
         103 => elevate(),
         104 => if (raw_thread_handle) |_| {
             raw_thread_pending_restart = false;
@@ -180,24 +180,7 @@ fn onWmTray(hwnd: win.HWND, wParam: usize, lParam: isize) void {
             _ = TrackPopupMenu(hMenu, 0, x, y, 0, hwnd, null);
             _ = SetThreadDpiAwarenessContext(.NULL);
         },
-        0x0400 => { // WM_USER
-            var rect: win.RECT = undefined;
-            _ = Shell_NotifyIconGetRect(&.{ .hWnd = hwnd, .uID = TRAY_UID }, &rect);
-            const ctr_x, const ctr_y = .{
-                @divTrunc(rect.left + rect.right, 2),
-                @divTrunc(rect.top + rect.bottom, 2),
-            };
-            std.debug.print("WM_USER: {d},{d}\n", .{ ctr_x, ctr_y });
-            _ = SetDlgItemInt(  hwnd, 0x4001, @bitCast(Shared.param.decay), 0 );
-            _ = SetDlgItemInt(  hwnd, 0x4002, @bitCast(Shared.param.sensY), 1 );
-            _ = SetDlgItemInt(  hwnd, 0x4003, @bitCast(Shared.param.sensX), 1 );
-            _ = SetDlgItemInt(  hwnd, 0x4004, @bitCast(Shared.param.stepY), 0 );
-            _ = SetDlgItemInt(  hwnd, 0x4005, @bitCast(Shared.param.stepX), 0 );
-            _ = CheckDlgButton( hwnd, 0x4006, @bitCast(Shared.param.flick)    );
-            _ = CheckDlgButton( hwnd, 0x4007, @bitCast(Shared.param.think)    );
-            if (0 == IsWindowVisible(hwnd)) _ = ShowWindowAsync(hwnd, 5);
-            _ = SetForegroundWindow(hwnd);
-        },
+        0x0400 => show(hwnd),
         0x0200 => std.debug.print("WM_MOUSEMOVE\n", .{}),
         0x0201 => std.debug.print("WM_LBUTTONDOWN\n", .{}),
         0x0202 => std.debug.print("WM_LBUTTONUP\n", .{}),
@@ -227,41 +210,35 @@ fn elevate() void {
     quit();
 }
 
-fn config() void {
-    _ = PostThreadMessageA(win.GetCurrentThreadId(), WM_TRAY, 0, 0x0400);
+fn quit() void {
+    _ = PostQuitMessage(0);
 }
 
-fn about(hwnd: win.HWND) void {
+fn info(hwnd: win.HWND) void {
     _ = MessageBoxA(hwnd, "Visit https://github.com/EsportToys/LibreScroll for more info.", "About LibreScroll " ++ LIBRE_SCROLL_VERSION_TEXT, 0);
 }
 
-fn quit() void {
-    _ = PostQuitMessage(0);
+fn show(hwnd: win.HWND) void {
+    _ = SetDlgItemInt(  hwnd, 0x4001, @bitCast(Shared.param.decay), 0 );
+    _ = SetDlgItemInt(  hwnd, 0x4002, @bitCast(Shared.param.sensY), 1 );
+    _ = SetDlgItemInt(  hwnd, 0x4003, @bitCast(Shared.param.sensX), 1 );
+    _ = SetDlgItemInt(  hwnd, 0x4004, @bitCast(Shared.param.stepY), 0 );
+    _ = SetDlgItemInt(  hwnd, 0x4005, @bitCast(Shared.param.stepX), 0 );
+    _ = CheckDlgButton( hwnd, 0x4006, @bitCast(Shared.param.flick)    );
+    _ = CheckDlgButton( hwnd, 0x4007, @bitCast(Shared.param.think)    );
+    if (0 == IsWindowVisible(hwnd)) _ = ShowWindowAsync(hwnd, 5);
+    _ = SetForegroundWindow(hwnd);
 }
 
 fn save(hwnd: win.HWND) void {
     const ini = "./options.ini";
     const sec = "LibreScroll";
-
     var buf: [32767:0]u8 = undefined;
-
-    _ = GetDlgItemTextA(hwnd, 0x4001, &buf, buf.len);
-    _ = WritePrivateProfileStringA(sec, "decay", &buf, ini);
-
-    _ = GetDlgItemTextA(hwnd, 0x4002, &buf, buf.len);
-    _ = WritePrivateProfileStringA(sec, "sensY", &buf, ini);
-
-    _ = GetDlgItemTextA(hwnd, 0x4003, &buf, buf.len);
-    _ = WritePrivateProfileStringA(sec, "sensX", &buf, ini);
-
-    _ = GetDlgItemTextA(hwnd, 0x4004, &buf, buf.len);
-    _ = WritePrivateProfileStringA(sec, "stepY", &buf, ini);
-
-    _ = GetDlgItemTextA(hwnd, 0x4005, &buf, buf.len);
-    _ = WritePrivateProfileStringA(sec, "stepX", &buf, ini);
-
+    inline for(.{ "decay", "sensY", "sensX", "stepY", "stepX" }, 0x4001..) |key, i| {
+        _ = GetDlgItemTextA(hwnd, i, &buf, buf.len);
+        _ = WritePrivateProfileStringA(sec, key, &buf, ini);
+    }
     _ = WritePrivateProfileStringA(sec, "flick", if (0 == IsDlgButtonChecked(hwnd, 0x4006)) "0" else "1", ini);
-
     _ = WritePrivateProfileStringA(sec, "think", if (0 == IsDlgButtonChecked(hwnd, 0x4007)) "0" else "1", ini);
 }
 
@@ -280,7 +257,7 @@ fn load() [7]i32 {
 }
 
 fn startThread() bool {
-    Shared.param.refresh();
+    Shared.param = @bitCast(load());
     raw_thread_handle = win.kernel32.CreateThread(
         null,
         0,
@@ -312,7 +289,11 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
 
     defer _ = DestroyWindow(hwnd);
 
-    _ = SetWindowLongPtrA(hwnd, -4, @bitCast(@intFromPtr(&rawProc)));
+    if (8 == @sizeOf(usize)) {
+        _ = SetWindowLongPtrA(hwnd, -4, @bitCast(@intFromPtr(&rawProc)));
+    } else {
+        _ = SetWindowLongA(hwnd, -4, @bitCast(@intFromPtr(&rawProc)));
+    }
 
     if (0 == RegisterRawInputDevices(&.{.{
         .usUsagePage = 0x01, // generic desktop
@@ -355,9 +336,6 @@ const Shared = extern struct {
     stepX: i32 = 1,
     flick: i32 = 0,
     think: i32 = 0,
-    fn refresh(this: *@This()) void {
-        this.* = @bitCast(load());
-    }
     const ms = 10;
     var param: @This() = .{};
     var vel: Vec2f = .{ 0, 0 };
@@ -538,8 +516,8 @@ extern "kernel32" fn FreeLibrary(*anyopaque) callconv(.winapi) i32;
 extern "kernel32" fn GetPrivateProfileIntA([*:0]const u8, [*:0]const u8, i32, [*:0]const u8) callconv(.winapi) i32;
 extern "kernel32" fn WritePrivateProfileStringA([*:0]const u8, [*:0]const u8, [*:0]const u8, [*:0]const u8) callconv(.winapi) i32;
 
-extern "user32" fn RegisterClassA(*const WNDCLASSA) callconv(.winapi) u16;
 extern "user32" fn SetWindowLongPtrA(win.HWND, i32, isize) callconv(.winapi) isize;
+extern "user32" fn SetWindowLongA(win.HWND, i32, i32) callconv(.winapi) i32;
 extern "user32" fn SetWindowTextA(win.HWND, ?[*:0]const u8) callconv(.winapi) i32;
 extern "user32" fn DefWindowProcA(win.HWND, u32, usize, isize) callconv(.winapi) isize;
 extern "user32" fn CreateWindowExA(u32, *const anyopaque, ?[*:0]const u8, u32, i32, i32, i32, i32, ?win.HWND, ?*const anyopaque, ?win.HINSTANCE, ?*const anyopaque) callconv(.winapi) ?win.HWND;
@@ -593,18 +571,6 @@ const DPI_AWARENESS_CONTEXT = enum(isize) {
 const DLGPROC = *const fn (win.HWND, u32, usize, isize) callconv(.winapi) isize;
 const TIMERPROC = *const fn (?win.HWND, u32, usize, u32) callconv(.winapi) void;
 const WNDPROC = *const fn (win.HWND, u32, usize, isize) callconv(.winapi) isize;
-const WNDCLASSA = extern struct {
-    style: u32 = 0,
-    lpfnWndProc: WNDPROC,
-    cbClsExtra: i32 = 0,
-    cbWndExtr: i32 = 0,
-    hInstance: ?win.HINSTANCE = null,
-    hIcon: ?win.HICON = null,
-    hCursor: ?win.HCURSOR = null,
-    hbrBackground: ?win.HBRUSH = null,
-    lpszMenuName: ?win.LPCSTR = null,
-    lpszClassName: win.LPCSTR,
-};
 
 const MSG = extern struct {
     hWnd: ?win.HWND,
