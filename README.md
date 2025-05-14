@@ -11,6 +11,9 @@ https://github.com/EsportToys/LibreScroll/assets/98432183/c7fc05a5-6b10-4b91-998
 2. Hold Mouse 3 and move your mouse, the cursor will stay in-place, mouse motion is instead converted to scroll momentum.
 3. Release middle-mouse-button to halt scroll momentum and release the cursor.
 
+
+To compile from source, run `zig build-exe main.zig main.rc main.manifest -O ReleaseSmall --subsystem windows`
+
 ## Options
 
 ![image](https://github.com/user-attachments/assets/b34945cb-b8d9-42f5-8646-02ebc7aa978a)
