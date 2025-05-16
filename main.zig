@@ -1,4 +1,3 @@
-const Param = @This();
 decay: i32 = 3,
 sensY: i32 = 9,
 sensX: i32 = 0,
@@ -7,6 +6,7 @@ stepX: i32 = 1,
 flick: i32 = 0,
 think: i32 = 0,
 
+var global_config: @This() = .{};
 var process_mutex: *anyopaque = undefined;
 var main_thread_id: u32 = undefined;
 var raw_thread_id: u32 = undefined;
@@ -15,17 +15,8 @@ var raw_thread_pending_restart = false;
 
 const Vec2f = @Vector(2, f32);
 const Vec2i = @Vector(2, i32);
-const Shared = struct {
-    const ms = 10;
-    var param: Param = .{};
-    var vel: Vec2f = @splat(0);
-    var acu: Vec2i = @splat(0);
-    var rect: [4]i32 = @splat(0);
-    var is_scrolling = false;
-    var cancel_pending = false;
-};
 
-const LIBRE_SCROLL_VERSION_TEXT = "v2.0";
+const LIBRE_SCROLL_VERSION_TEXT = "v2.1";
 const WM_TRAY = 0x8001;
 const WM_RAW_STOPPED = 0x8002;
 const WM_RAW_STARTED = 0x8003;
@@ -179,7 +170,7 @@ fn menu(hwnd: win.HWND, uid: u16, x: i16, y: i16) void {
     const tray_hmenu = LoadMenuA(null, "menu") orelse return;
     defer _ = DestroyMenu(tray_hmenu);
     const hMenu = GetSubMenu(tray_hmenu, IsUserAnAdmin() | @as(i32, if (raw_thread_handle) |_| 2 else 0)) orelse return;
-    var rect:[4]i32 = undefined;
+    var rect: [4]i32 = undefined;
     _ = Shell_NotifyIconGetRect(&.{ .hWnd = hwnd, .uID = uid }, &rect);
     _ = SetForegroundWindow(hwnd);
     _ = SetThreadDpiAwarenessContext(.PER_MONITOR_AWARE_V2);
@@ -188,13 +179,13 @@ fn menu(hwnd: win.HWND, uid: u16, x: i16, y: i16) void {
 }
 
 fn show(hwnd: win.HWND) void {
-    _ = SetDlgItemInt(  hwnd, 0x4001, @bitCast(Shared.param.decay), 0 );
-    _ = SetDlgItemInt(  hwnd, 0x4002, @bitCast(Shared.param.sensY), 1 );
-    _ = SetDlgItemInt(  hwnd, 0x4003, @bitCast(Shared.param.sensX), 1 );
-    _ = SetDlgItemInt(  hwnd, 0x4004, @bitCast(Shared.param.stepY), 0 );
-    _ = SetDlgItemInt(  hwnd, 0x4005, @bitCast(Shared.param.stepX), 0 );
-    _ = CheckDlgButton( hwnd, 0x4006, @bitCast(Shared.param.flick)    );
-    _ = CheckDlgButton( hwnd, 0x4007, @bitCast(Shared.param.think)    );
+    _ = SetDlgItemInt(  hwnd, 0x4001, @bitCast(global_config.decay), 0 );
+    _ = SetDlgItemInt(  hwnd, 0x4002, @bitCast(global_config.sensY), 1 );
+    _ = SetDlgItemInt(  hwnd, 0x4003, @bitCast(global_config.sensX), 1 );
+    _ = SetDlgItemInt(  hwnd, 0x4004, @bitCast(global_config.stepY), 0 );
+    _ = SetDlgItemInt(  hwnd, 0x4005, @bitCast(global_config.stepX), 0 );
+    _ = CheckDlgButton( hwnd, 0x4006, @bitCast(global_config.flick)    );
+    _ = CheckDlgButton( hwnd, 0x4007, @bitCast(global_config.think)    );
     if (0 == IsWindowVisible(hwnd)) _ = ShowWindowAsync(hwnd, 5);
     _ = SetForegroundWindow(hwnd);
 }
@@ -203,7 +194,7 @@ fn save(hwnd: win.HWND) void {
     const ini = "./options.ini";
     const sec = "LibreScroll";
     var buf: [32767:0]u8 = undefined;
-    inline for(.{ "decay", "sensY", "sensX", "stepY", "stepX" }, 0x4001..) |key, i| {
+    inline for (.{ "decay", "sensY", "sensX", "stepY", "stepX" }, 0x4001..) |key, i| {
         _ = GetDlgItemTextA(hwnd, i, &buf, buf.len);
         _ = WritePrivateProfileStringA(sec, key, &buf, ini);
     }
@@ -214,13 +205,13 @@ fn save(hwnd: win.HWND) void {
 fn startThread() bool {
     const ini = "./options.ini";
     const sec = "LibreScroll";
-    Shared.param.decay = @max( 0 ,           GetPrivateProfileIntA(sec, "decay", Shared.param.decay, ini)   );
-    Shared.param.sensY =                     GetPrivateProfileIntA(sec, "sensY", Shared.param.sensY, ini)    ;
-    Shared.param.sensX =                     GetPrivateProfileIntA(sec, "sensX", Shared.param.sensX, ini)    ;
-    Shared.param.stepY = @max( 0 ,           GetPrivateProfileIntA(sec, "stepY", Shared.param.stepY, ini)   );
-    Shared.param.stepX = @max( 0 ,           GetPrivateProfileIntA(sec, "stepX", Shared.param.stepX, ini)   );
-    Shared.param.flick = @max( 0 , @min( 1 , GetPrivateProfileIntA(sec, "flick", Shared.param.flick, ini) ) );
-    Shared.param.think = @max( 0 , @min( 1 , GetPrivateProfileIntA(sec, "think", Shared.param.think, ini) ) );
+    global_config.decay = @max( 0 ,           GetPrivateProfileIntA(sec, "decay", global_config.decay, ini)   );
+    global_config.sensY =                     GetPrivateProfileIntA(sec, "sensY", global_config.sensY, ini)    ;
+    global_config.sensX =                     GetPrivateProfileIntA(sec, "sensX", global_config.sensX, ini)    ;
+    global_config.stepY = @max( 0 ,           GetPrivateProfileIntA(sec, "stepY", global_config.stepY, ini)   );
+    global_config.stepX = @max( 0 ,           GetPrivateProfileIntA(sec, "stepX", global_config.stepX, ini)   );
+    global_config.flick = @max( 0 , @min( 1 , GetPrivateProfileIntA(sec, "flick", global_config.flick, ini) ) );
+    global_config.think = @max( 0 , @min( 1 , GetPrivateProfileIntA(sec, "think", global_config.think, ini) ) );
     raw_thread_handle = win.kernel32.CreateThread(
         null,
         0,
@@ -255,130 +246,119 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
 
     _ = PostThreadMessageA(main_thread_id, WM_RAW_STARTED, 0, 0);
 
-    var msg: MSG = undefined;
-    var past = win.QueryPerformanceCounter();
+    const interval_ms = 10;
     const qpf = win.QueryPerformanceFrequency();
+    var past = win.QueryPerformanceCounter();
+    var size: u32 = @sizeOf(RAWINPUT.MOUSE);
+    var data: RAWINPUT.MOUSE = undefined;
+    var state: State = .{};
+    var timer: usize = 0;
+    var acu: Vec2i = @splat(0);
+    var msg: MSG = undefined;
     while (GetMessageA(&msg, null, 0, 0) > 0) {
-        if (0xff == msg.message) rawProc(msg.lParam);
+        if (0xff == msg.message
+            and 0 < GetRawInputData(msg.lParam, 0x10000003, &data, &size, @sizeOf(RAWINPUT.HEADER))
+            and null != data.header.hDevice) {
+            const flags = data.data.usButtonFlags;
+            if (flags == 0) { // movement only
+                acu += .{ data.data.lLastX, data.data.lLastY };
+            } else if (32 == 32 | flags) {
+                if (global_config.flick == 0) {
+                    if (0 != KillTimer(null, timer)) timer = 0;
+                }
+                state.is_scrolling = false;
+                state.cancel_pending = false;
+                _ = ClipCursor(null);
+            } else if (16 == 16 | flags) {
+                if (timer == 0) {
+                    timer = SetTimer(null, 0, interval_ms, null);
+                    if (timer == 0) break;
+                }
+                acu = @splat(0);
+                state.vel = @splat(0);
+                state.is_scrolling = true;
+                state.cancel_pending = true;
+                _ = GetCursorPos(state.rect[0..2]);
+                state.rect[2] = state.rect[0] + 1;
+                state.rect[3] = state.rect[1] + 1;
+                _ = ClipCursor(&state.rect);
+            } else if (global_config.flick != 0 and !state.is_scrolling) {
+                state.vel = @splat(0); // in flick mode, any mouse action besides the above should immediately halt
+                if (0 != KillTimer(null, timer)) timer = 0;
+            }
+        }
         _ = DispatchMessageA(&msg);
         const now = win.QueryPerformanceCounter();
         const dt = now - past;
-        if (dt * 1000 < qpf * Shared.ms) continue;
-        past = now;
-        simulation(dt, qpf);
+        if (dt * 1000 > qpf * interval_ms) {
+            if (state.step(dt, qpf, acu)) |send| state.flush(send);
+            acu = @splat(0);
+            past = now;
+        }
     }
 
     return 0;
 }
 
-fn rawProc(lParam: isize) void {
-    const timer = struct {
-        var handle: usize = 0;
-    };
-    var data: RAWINPUT.MOUSE = undefined;
-    var size: u32 = @sizeOf(RAWINPUT.MOUSE);
-    if (0 < GetRawInputData(lParam, 0x10000003, &data, &size, @sizeOf(RAWINPUT.HEADER))) {
-        _ = data.header.hDevice orelse return;
-        const flags = data.data.usButtonFlags;
-        if (flags == 0) { // movement only
-            Shared.acu += .{ data.data.lLastX, data.data.lLastY };
-        } else if (32 == 32 | flags) {
-            if (Shared.param.flick == 0) {
-                const success = KillTimer(null, timer.handle);
-                if (success != 0) timer.handle = 0;
-            }
-            Shared.is_scrolling = false;
-            Shared.cancel_pending = false;
-            _ = ClipCursor(null);
-        } else if (16 == 16 | flags) {
-            if (timer.handle == 0) {
-                timer.handle = SetCoalescableTimer(null, 0, Shared.ms, null, 0);
-                if (timer.handle == 0) _ = PostThreadMessageA(win.GetCurrentThreadId(), 0x0012, 0, 0);
-            }
-            Shared.acu = @splat(0);
-            Shared.vel = @splat(0);
-            Shared.is_scrolling = true;
-            Shared.cancel_pending = true;
-            _ = GetCursorPos(Shared.rect[0..2]);
-            Shared.rect[2] = Shared.rect[0] + 1;
-            Shared.rect[3] = Shared.rect[1] + 1;
-            _ = ClipCursor(&Shared.rect);
-        } else if (Shared.param.flick != 0 and !Shared.is_scrolling) {
-            Shared.vel = @splat(0); // in flick mode, any mouse action besides the above should immediately halt
-            const success = KillTimer(null, timer.handle);
-            if (success != 0) timer.handle = 0;
-        }
-    }
-}
+const State = struct {
+    vel: Vec2f = @splat(0),
+    res: Vec2f = @splat(0),
+    rect: [4]i32 = @splat(0),
+    is_scrolling: bool = false,
+    cancel_pending: bool = false,
 
-fn simulation(tick: u64, freq: u64) void {
-    if (Shared.is_scrolling) {
-        var current_rect: [4]i32 = undefined;
-        _ = GetClipCursor(&current_rect);
-        if (current_rect[0] != Shared.rect[0] or
-            current_rect[1] != Shared.rect[1] or
-            current_rect[2] != Shared.rect[2] or
-            current_rect[3] != Shared.rect[3]) _ = ClipCursor(&Shared.rect);
-        var delta: Vec2f = .{
-            @floatFromInt(Shared.acu[0]),
-            @floatFromInt(Shared.acu[1]),
-        };
-        delta *= .{ @floatFromInt(Shared.param.sensX), @floatFromInt(Shared.param.sensY) };
-        Shared.vel += delta;
-    } else if (Shared.param.flick == 0) {
-        return;
-    }
-    defer Shared.acu = @splat(0);
-    var dt: f32 = @floatFromInt(tick);
-    dt /= @floatFromInt(freq);
-    const mu: f32 = @floatFromInt(Shared.param.decay);
-    const f0 = @exp(-dt * mu);
-    const f1 = (1 - f0) / mu;
-    var send = Shared.vel;
-    send *= @splat(f1);
-    Shared.vel *= @splat(f0);
-    if (@reduce(.Add, Shared.vel * Shared.vel) < 1) {
-        Shared.vel /= @splat(mu);
-        send += Shared.vel;
-        Shared.vel = @splat(0);
-    }
-    sendScroll(send);
-}
-
-fn sendScroll(delta: Vec2f) void {
-    const static = struct {
-        var res: Vec2f = @splat(0);
-    };
-    static.res += delta;
-    const thresh: Vec2f = .{ @floatFromInt(Shared.param.stepX), @floatFromInt(Shared.param.stepY) };
-    const batch = @trunc(static.res / thresh);
-    var send: Vec2i = @splat(0);
-    if (0 != batch[0]) {
-        const dx = batch[0] * thresh[0];
-        send[0] = @intFromFloat((dx));
-        static.res[0] -= dx;
-    }
-    if (0 != batch[1]) {
-        const dy = batch[1] * thresh[1];
-        send[1] = @intFromFloat((dy));
-        static.res[1] -= dy;
-    }
-    if (Shared.param.think != 0) {
-        if (@abs(send[0]) > @abs(send[1])) {
-            send[1] = 0;
-            static.res[1] = 0;
-        } else {
-            send[0] = 0;
-            static.res[0] = 0;
+    fn step(state: *State, tick: u64, freq: u64, acu: Vec2i) ?Vec2f {
+        if (state.is_scrolling) {
+            var current_rect: [4]i32 = undefined;
+            _ = GetClipCursor(&current_rect);
+            if (current_rect[0] != state.rect[0] or
+                current_rect[1] != state.rect[1] or
+                current_rect[2] != state.rect[2] or
+                current_rect[3] != state.rect[3]) _ = ClipCursor(&state.rect);
+            var delta: Vec2f = .{ @floatFromInt(global_config.sensX), @floatFromInt(global_config.sensY) };
+            delta *= @floatFromInt(acu);
+            state.vel += delta;
+        } else if (global_config.flick == 0) {
+            return null;
         }
+        var dt: f32 = @floatFromInt(tick);
+        dt /= @floatFromInt(freq);
+        const mu: f32 = @floatFromInt(global_config.decay);
+        const f0 = @exp(-dt * mu);
+        const f1 = (1 - f0) / mu;
+        var send = state.vel;
+        send *= @splat(f1);
+        state.vel *= @splat(f0);
+        if (@reduce(.Add, state.vel * state.vel) < 1) {
+            state.vel /= @splat(mu);
+            send += state.vel;
+            state.vel = @splat(0);
+        }
+        return send;
     }
-    if (0 != send[0] or 0 != send[1]) {
+
+    fn flush(state: *State, delta: Vec2f) void {
+        state.res += delta;
+        const thresh: Vec2f = .{ @floatFromInt(global_config.stepX), @floatFromInt(global_config.stepY) };
+        const batch = thresh * @trunc(state.res / thresh);
+        var send: Vec2i = @intFromFloat(batch);
+        state.res -= batch;
+        if (global_config.think != 0) {
+            if (@abs(send[0]) > @abs(send[1])) {
+                send[1] = 0;
+                state.res[1] = 0;
+            } else {
+                send[0] = 0;
+                state.res[0] = 0;
+            }
+        }
+        if (0 == send[0] and 0 == send[1]) return;
         const buf: [2]INPUT = .{
             .mi(.{ .mouseData = -send[1], .dwFlags = 0x0800 }),
             .mi(.{ .mouseData =  send[0], .dwFlags = 0x1000 }),
         };
-        if (Shared.cancel_pending) {
-            Shared.cancel_pending = false;
+        if (state.cancel_pending) {
+            state.cancel_pending = false;
             _ = sendInputs(&.{
                 .ki(.{ .dwFlags = 0 }),
                 .ki(.{ .dwFlags = 2 }),
@@ -390,7 +370,7 @@ fn sendScroll(delta: Vec2f) void {
             _ = sendInputs(buf[1..]);
         }
     }
-}
+};
 
 fn sendInputs(cmd: []const INPUT) u32 {
     return SendInput(@truncate(cmd.len), cmd.ptr, @sizeOf(INPUT));
@@ -425,7 +405,6 @@ extern "user32" fn SetForegroundWindow(win.HWND) callconv(.winapi) i32;
 extern "user32" fn GetSubMenu(win.HMENU, i32) callconv(.winapi) ?win.HMENU;
 extern "user32" fn MessageBoxA(?win.HWND, ?[*:0]const u8, ?[*:0]const u8, u32) callconv(.winapi) i32;
 extern "user32" fn SetTimer(?win.HWND, usize, u32, ?TIMERPROC) callconv(.winapi) usize;
-extern "user32" fn SetCoalescableTimer(?win.HWND, usize, u32, ?TIMERPROC, u32) callconv(.winapi) usize;
 extern "user32" fn KillTimer(?win.HWND, usize) callconv(.winapi) i32;
 extern "user32" fn GetClipCursor(*[4]i32) callconv(.winapi) i32;
 extern "user32" fn GetCursorPos(*[2]i32) callconv(.winapi) i32;
@@ -542,8 +521,8 @@ const INPUT = extern struct {
         wParamL: u16 = 0,
         wParamH: u16 = 0,
     };
-    fn mi(m: MOUSEINPUT) INPUT { return .{ .type = 0, .input = .{.mi = m} }; }
-    fn ki(k: KEYBDINPUT) INPUT { return .{ .type = 1, .input = .{.ki = k} }; }
+    fn mi(m: MOUSEINPUT)    INPUT { return .{ .type = 0, .input = .{.mi = m} }; }
+    fn ki(k: KEYBDINPUT)    INPUT { return .{ .type = 1, .input = .{.ki = k} }; }
     fn hi(h: HARDWAREINPUT) INPUT { return .{ .type = 2, .input = .{.hi = h} }; }
 };
 
@@ -560,25 +539,25 @@ const NIM = enum(u32) {
 };
 
 const NOTIFYICONDATAA = extern struct {
-    cbSize: u32 = @sizeOf(@This()),
+    cbSize: u32 = @sizeOf(NOTIFYICONDATAA),
     hWnd: ?win.HWND = null,
     uID: u32 = 0,
     uFlags: u32 = 0,
     uCallbackMessage: u32 = 0, // uFlags 1, user defined WM_* message identifier
     hIcon: ?win.HICON = null, // uFlags 2, tray icon
-    szTip: [128]u8 = .{0} ** 128, // uFlags 4, hover tooltips, 64 for below win2k
+    szTip: [128]u8 = @splat(0), // uFlags 4, hover tooltips, 64 for below win2k
     dwState: u32 = 0, // uFlags 8, set state flags
     dwStateMask: u32 = 0, // uFlags 8, which dwState to change
-    szInfo: [256]u8 = .{0} ** 256, // uFlags 16, balloon text
+    szInfo: [256]u8 = @splat(0), // uFlags 16, balloon text
     uTimeout: u32 = 0, // uFlags 16, or uVersion if calling with SETVERSION
-    szInfoTitle: [64]u8 = .{0} ** 64, // balloon title
+    szInfoTitle: [64]u8 = @splat(0), // balloon title
     dwInfoFlags: u32 = 0, // balloon options
     guidItem: win.GUID = @bitCast(@as(u128, 0)), // uFlags 32
     hBalloonIcon: ?win.HICON = null, // custom balloon title icon (require dwInfoFlags 0x4 bit)
 };
 
 const NOTIFYICONIDENTIFIER = extern struct {
-    cbSize: u32 = @sizeOf(@This()),
+    cbSize: u32 = @sizeOf(NOTIFYICONIDENTIFIER),
     hWnd: win.HWND,
     uID: u32,
     guidItem: win.GUID = @bitCast(@as(u128, 0)),
