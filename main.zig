@@ -1,7 +1,11 @@
-const LIBRE_SCROLL_VERSION_TEXT = "v2.0";
-
-const std = @import("std");
-const win = std.os.windows;
+const Param = @This();
+decay: i32 = 3,
+sensY: i32 = 9,
+sensX: i32 = 0,
+stepY: i32 = 1,
+stepX: i32 = 1,
+flick: i32 = 0,
+think: i32 = 0,
 
 var process_mutex: *anyopaque = undefined;
 var main_thread_id: u32 = undefined;
@@ -9,10 +13,25 @@ var raw_thread_id: u32 = undefined;
 var raw_thread_handle: ?*anyopaque = null;
 var raw_thread_pending_restart = false;
 
+const Vec2f = @Vector(2, f32);
+const Vec2i = @Vector(2, i32);
+const Shared = struct {
+    const ms = 10;
+    var param: Param = .{};
+    var vel: Vec2f = @splat(0);
+    var acu: Vec2i = @splat(0);
+    var rect: [4]i32 = @splat(0);
+    var is_scrolling = false;
+    var cancel_pending = false;
+};
+
+const LIBRE_SCROLL_VERSION_TEXT = "v2.0";
 const WM_TRAY = 0x8001;
 const WM_RAW_STOPPED = 0x8002;
 const WM_RAW_STARTED = 0x8003;
 const TRAY_UID = 0x69;
+
+const win = @import("std").os.windows;
 
 pub fn main() void {
     process_mutex = CreateMutexA(null, 1, "LibreScroll") orelse return;
@@ -32,17 +51,18 @@ pub fn main() void {
     _ = SendMessageA(hwndTray, 0x0080, 0, @bitCast(@intFromPtr(ico))); // set small icon
     _ = SendMessageA(hwndTray, 0x0080, 1, @bitCast(@intFromPtr(ico))); // set big icon
 
-    const tray_data: NOTIFYICONDATAA = .{
+    var tray_data: NOTIFYICONDATAA = .{
         .hWnd = hwndTray,
         .uID = TRAY_UID,
         .uFlags = 0x8F,
         .uCallbackMessage = WM_TRAY,
         .hIcon = ico,
         .uTimeout = 4,
-        .szTip = "LibreScroll".* ++ .{0} ** (128 - 11),
+        .szTip = @splat(0),
         .dwState = 0,
         .dwStateMask = 1,
     };
+    tray_data.szTip[0..11].* = "LibreScroll".*;
 
     if (0 == Shell_NotifyIconA(.ADD, &tray_data)) return;
     if (0 == Shell_NotifyIconA(.SETVERSION, &tray_data)) return;
@@ -52,8 +72,29 @@ pub fn main() void {
 
     var msg: MSG = undefined;
     while (GetMessageA(&msg, null, 0, 0) > 0) {
-        msg.hWnd = msg.hWnd orelse hwndTray; // route thread messages to wndproc
-        if (0 == IsDialogMessageA(hwndTray, &msg)) {
+        if (null == msg.hWnd) {
+            if (WM_RAW_STOPPED == msg.message) {
+                tray_data.szTip[11..22].* = " - Inactive".*;
+                _ = Shell_NotifyIconA(.MODIFY, &tray_data);
+                if (GetDlgItem(hwndTray, 104)) |hPause| {
+                    _ = SetWindowTextA(hPause, "Unpause");
+                    _ = SetWindowLongA(hPause, -12, 105);
+                }
+                win.CloseHandle(raw_thread_handle.?);
+                raw_thread_handle = null;
+                if (raw_thread_pending_restart) {
+                    raw_thread_pending_restart = false;
+                    _ = startThread(); // non-critical failure
+                }
+            } else if (WM_RAW_STARTED == msg.message) {
+                tray_data.szTip[11..20].* = " - Active".*;
+                _ = Shell_NotifyIconA(.MODIFY, &tray_data);
+                if (GetDlgItem(hwndTray, 105)) |hUnpause| {
+                    _ = SetWindowTextA(hUnpause, "Pause");
+                    _ = SetWindowLongA(hUnpause, -12, 104);
+                }
+            }
+        } else if (0 == IsDialogMessageA(hwndTray, &msg)) {
             _ = TranslateMessage(&msg);
             _ = DispatchMessageA(&msg);
         }
@@ -62,57 +103,10 @@ pub fn main() void {
 
 fn trayProc(hwnd: win.HWND, uMsg: u32, wParam: usize, lParam: isize) callconv(.winapi) isize {
     switch (uMsg) {
-        else => {
-            std.debug.print("unknown: {x}\n", .{uMsg});
-            return 0;
-        },
-        0x0000 => { // WM_NULL
-            std.debug.print("WM_NULL\n", .{});
-        },
-        0x0010 => { // WM_CLOSE
-            _ = ShowWindowAsync(hwnd, 0); // hide to tray instead of quitting
-        },
-        0x0110 => { // WM_INITDIALOG
-            std.debug.print("init\n", .{});
-        },
-        0x0111 => { // WM_COMMAND
-            onWmCommand(hwnd, wParam, lParam);
-        },
-        WM_TRAY => {
-            onWmTray(hwnd, wParam, lParam);
-        },
-        WM_RAW_STOPPED => {
-            win.CloseHandle(raw_thread_handle.?);
-            raw_thread_handle = null;
-            std.debug.print("WM_RAW_STOPPED\n", .{});
-            _ = Shell_NotifyIconA(.MODIFY, &.{
-                .hWnd = hwnd,
-                .uID = TRAY_UID,
-                .uFlags = 0x84,
-                .szTip = "LibreScroll - Inactive".* ++ .{0} ** (128 - 22),
-            });
-            if (GetDlgItem(hwnd, 104)) |hPause| {
-                _ = SetWindowTextA(hPause, "Unpause");
-                _ = SetWindowLongA(hPause, -12, 105);
-            }
-            if (raw_thread_pending_restart) {
-                raw_thread_pending_restart = false;
-                _ = startThread(); // non-critical failure
-            }
-        },
-        WM_RAW_STARTED => {
-            std.debug.print("WM_RAW_STARTED\n", .{});
-            _ = Shell_NotifyIconA(.MODIFY, &.{
-                .hWnd = hwnd,
-                .uID = TRAY_UID,
-                .uFlags = 0x84,
-                .szTip = "LibreScroll - Active".* ++ .{0} ** (128 - 20),
-            });
-            if (GetDlgItem(hwnd, 105)) |hUnpause| {
-                _ = SetWindowTextA(hUnpause, "Pause");
-                _ = SetWindowLongA(hUnpause, -12, 104);
-            }
-        },
+        else => return 0,
+        0x0010 => _ = ShowWindowAsync(hwnd, 0), // hide to tray instead of quitting
+        0x0111 => onWmCommand(hwnd, wParam, lParam),
+        WM_TRAY => onWmTray(hwnd, wParam, lParam),
     }
     return 1;
 }
@@ -122,7 +116,6 @@ fn onWmCommand(hwnd: win.HWND, wParam: usize, lParam: isize) void {
     const id = wParam & 0xFFFF;
     const uMsg = wParam >> 16;
     const is_accel = (null == hCtrl) and (1 == uMsg); _ = is_accel;
-    std.debug.print("{x} ({x})\n", .{id, uMsg});
     switch (id) {
         else => {},
         100 => quit(),
@@ -136,7 +129,6 @@ fn onWmCommand(hwnd: win.HWND, wParam: usize, lParam: isize) void {
         105, 106 => {
             if (106 == id) save(hwnd);
             if (raw_thread_handle) |_| {
-                std.debug.print("restart\n", .{});
                 raw_thread_pending_restart = true;
                 _ = PostThreadMessageA(raw_thread_id, 0x0012, 0, 0);
             } else {
@@ -219,22 +211,16 @@ fn save(hwnd: win.HWND) void {
     _ = WritePrivateProfileStringA(sec, "think", if (0 == IsDlgButtonChecked(hwnd, 0x4007)) "0" else "1", ini);
 }
 
-fn load() [7]i32 {
+fn startThread() bool {
     const ini = "./options.ini";
     const sec = "LibreScroll";
-    return .{
-        @max( 0 ,           GetPrivateProfileIntA(sec, "decay", Shared.param.decay, ini)   ),
-                            GetPrivateProfileIntA(sec, "sensY", Shared.param.sensY, ini)    ,
-                            GetPrivateProfileIntA(sec, "sensX", Shared.param.sensX, ini)    ,
-        @max( 0 ,           GetPrivateProfileIntA(sec, "stepY", Shared.param.stepY, ini)   ),
-        @max( 0 ,           GetPrivateProfileIntA(sec, "stepX", Shared.param.stepX, ini)   ),
-        @max( 0 , @min( 1 , GetPrivateProfileIntA(sec, "flick", Shared.param.flick, ini) ) ),
-        @max( 0 , @min( 1 , GetPrivateProfileIntA(sec, "think", Shared.param.think, ini) ) ),
-    };
-}
-
-fn startThread() bool {
-    Shared.param = @bitCast(load());
+    Shared.param.decay = @max( 0 ,           GetPrivateProfileIntA(sec, "decay", Shared.param.decay, ini)   );
+    Shared.param.sensY =                     GetPrivateProfileIntA(sec, "sensY", Shared.param.sensY, ini)    ;
+    Shared.param.sensX =                     GetPrivateProfileIntA(sec, "sensX", Shared.param.sensX, ini)    ;
+    Shared.param.stepY = @max( 0 ,           GetPrivateProfileIntA(sec, "stepY", Shared.param.stepY, ini)   );
+    Shared.param.stepX = @max( 0 ,           GetPrivateProfileIntA(sec, "stepX", Shared.param.stepX, ini)   );
+    Shared.param.flick = @max( 0 , @min( 1 , GetPrivateProfileIntA(sec, "flick", Shared.param.flick, ini) ) );
+    Shared.param.think = @max( 0 , @min( 1 , GetPrivateProfileIntA(sec, "think", Shared.param.think, ini) ) );
     raw_thread_handle = win.kernel32.CreateThread(
         null,
         0,
@@ -285,26 +271,7 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
     return 0;
 }
 
-const Vec2f = @Vector(2, f32);
-const Vec2i = @Vector(2, i32);
-const Shared = extern struct {
-    decay: i32 = 3,
-    sensY: i32 = 9,
-    sensX: i32 = 0,
-    stepY: i32 = 1,
-    stepX: i32 = 1,
-    flick: i32 = 0,
-    think: i32 = 0,
-    const ms = 10;
-    var param: @This() = .{};
-    var vel: Vec2f = @splat(0);
-    var acu: Vec2i = @splat(0);
-    var rect: [4]i32 = undefined;
-    var is_scrolling = false;
-    var cancel_pending = false;
-};
-
-fn rawProc(lParam: isize) callconv(.winapi) void {
+fn rawProc(lParam: isize) void {
     const timer = struct {
         var handle: usize = 0;
     };
@@ -323,7 +290,6 @@ fn rawProc(lParam: isize) callconv(.winapi) void {
             Shared.is_scrolling = false;
             Shared.cancel_pending = false;
             _ = ClipCursor(null);
-            std.debug.print("m3 up\n", .{});
         } else if (16 == 16 | flags) {
             if (timer.handle == 0) {
                 timer.handle = SetCoalescableTimer(null, 0, Shared.ms, null, 0);
@@ -337,7 +303,6 @@ fn rawProc(lParam: isize) callconv(.winapi) void {
             Shared.rect[2] = Shared.rect[0] + 1;
             Shared.rect[3] = Shared.rect[1] + 1;
             _ = ClipCursor(&Shared.rect);
-            std.debug.print("m3 down\n", .{});
         } else if (Shared.param.flick != 0 and !Shared.is_scrolling) {
             Shared.vel = @splat(0); // in flick mode, any mouse action besides the above should immediately halt
             const success = KillTimer(null, timer.handle);
@@ -465,15 +430,15 @@ extern "user32" fn KillTimer(?win.HWND, usize) callconv(.winapi) i32;
 extern "user32" fn GetClipCursor(*[4]i32) callconv(.winapi) i32;
 extern "user32" fn GetCursorPos(*[2]i32) callconv(.winapi) i32;
 extern "user32" fn ClipCursor(?*const [4]i32) callconv(.winapi) i32;
-extern "user32" fn GetDlgItem(?win.HWND, i32) callconv(.winapi) ?win.HWND;
-extern "user32" fn IsDialogMessageA(win.HWND, *MSG) callconv(.winapi) i32;
-extern "user32" fn CheckDlgButton(win.HWND, i32, u32) callconv(.winapi) i32;
-extern "user32" fn IsDlgButtonChecked(win.HWND, i32) callconv(.winapi) u32;
-extern "user32" fn GetDlgItemTextA(win.HWND, i32, [*:0]u8, i32) callconv(.winapi) u32;
-extern "user32" fn GetDlgItemInt(win.HWND, i32, ?*i32, i32) callconv(.winapi) u32;
-extern "user32" fn SetDlgItemInt(win.HWND, i32, u32, i32) callconv(.winapi) i32;
-extern "user32" fn CreateDialogParamA(?win.HMODULE, [*:0]const u8, ?win.HWND, ?DLGPROC, isize) callconv(.winapi) ?win.HWND;
 extern "user32" fn SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT) callconv(.winapi) DPI_AWARENESS_CONTEXT;
+extern "user32" fn CreateDialogParamA(?win.HMODULE, [*:0]const u8, ?win.HWND, ?DLGPROC, isize) callconv(.winapi) ?win.HWND;
+extern "user32" fn GetDlgItem(?win.HWND, i32) callconv(.winapi) ?win.HWND;
+extern "user32" fn SetDlgItemInt(win.HWND, i32, u32, i32) callconv(.winapi) i32;
+extern "user32" fn GetDlgItemInt(win.HWND, i32, ?*i32, i32) callconv(.winapi) u32;
+extern "user32" fn GetDlgItemTextA(win.HWND, i32, [*:0]u8, i32) callconv(.winapi) u32;
+extern "user32" fn IsDialogMessageA(win.HWND, *MSG) callconv(.winapi) i32;
+extern "user32" fn IsDlgButtonChecked(win.HWND, i32) callconv(.winapi) u32;
+extern "user32" fn CheckDlgButton(win.HWND, i32, u32) callconv(.winapi) i32;
 
 const DPI_AWARENESS_CONTEXT = enum(isize) {
     NULL = 0,
