@@ -16,10 +16,12 @@ var raw_thread_pending_restart = false;
 const Vec2f = @Vector(2, f32);
 const Vec2i = @Vector(2, i32);
 
-const LIBRE_SCROLL_VERSION_TEXT = "v2.1";
+const LIBRE_SCROLL_VERSION_TEXT = "v2.1.1";
 const WM_TRAY = 0x8001;
 const WM_RAW_STOPPED = 0x8002;
 const WM_RAW_STARTED = 0x8003;
+const WM_HOOK_STOPPED = 0x8004;
+const WM_HOOK_STARTED = 0x8005;
 const TRAY_UID = 0x69;
 
 const win = @import("std").os.windows;
@@ -220,7 +222,6 @@ fn startThread() bool {
         0,
         &raw_thread_id,
     ) orelse return false;
-    _ = SetThreadPriority(raw_thread_handle.?, 15); // THREAD_PRIORITY_TIME_CRITICAL
     return true;
 }
 
@@ -230,6 +231,18 @@ fn hookProc(code: i32, wParam: usize, lParam: isize) callconv(.winapi) isize {
         if (0 == 3 & inf.flags) return 1;
     }
     return CallNextHookEx(null, code, wParam, lParam);
+}
+
+fn hookMain(_: ?*anyopaque) callconv(.winapi) u32 {
+    defer _ = PostThreadMessageA(raw_thread_id, 0x0012, 0, 0);
+    const hhook = SetWindowsHookExA(14, hookProc, null, 0) orelse return 0;
+    defer _ = UnhookWindowsHookEx(hhook);
+    _ = PostThreadMessageA(raw_thread_id, WM_HOOK_STARTED, 0, 0);
+    var msg: MSG = undefined;
+    while (GetMessageA(&msg, null, 0, 0) > 0) {
+        _ = DispatchMessageA(&msg);
+    }
+    return 0;
 }
 
 fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
@@ -253,8 +266,19 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
         .hwndTarget = null,
     }}, 1, @sizeOf(RAWINPUTDEVICE));
 
-    const hhook = SetWindowsHookExA(14, hookProc, null, 0) orelse return 0;
-    defer _ = UnhookWindowsHookEx(hhook);
+    var hook_active = false;
+    var hook_thread_id: u32 = undefined;
+    const hook_thread_handle = win.kernel32.CreateThread(
+        null,
+        0,
+        &hookMain,
+        null,
+        0,
+        &hook_thread_id,
+    ) orelse return 0;
+    _ = SetThreadPriority(hook_thread_handle, 15); // THREAD_PRIORITY_TIME_CRITICAL
+    defer win.CloseHandle(hook_thread_handle);
+    defer _ = PostThreadMessageA(hook_thread_id, 0x0012, 0, 0);
 
     _ = PostThreadMessageA(main_thread_id, WM_RAW_STARTED, 0, 0);
 
@@ -270,6 +294,10 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
     var msg: MSG = undefined;
     while (GetMessageA(&msg, null, 0, 0) > 0) {
         defer _ = DispatchMessageA(&msg);
+        if (!hook_active) {
+            if (WM_HOOK_STARTED == msg.message) hook_active = true;
+            continue;
+        }
         if (0xff == msg.message
             and GetRawInputData(msg.lParam, 0x10000003, &data, &size, @sizeOf(RAWINPUT.HEADER)) > 0) _: {
             const flags = data.data.usButtonFlags;
