@@ -224,6 +224,14 @@ fn startThread() bool {
     return true;
 }
 
+fn hookProc(code: i32, wParam: usize, lParam: isize) callconv(.winapi) isize {
+    if (wParam == 0x207 or wParam == 0x208) {
+        const inf: *const MSLLHOOKSTRUCT = @ptrFromInt(@as(usize, @bitCast(lParam)));
+        if (0 == 3 & inf.flags) return 1;
+    }
+    return CallNextHookEx(null, code, wParam, lParam);
+}
+
 fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
     defer _ = PostThreadMessageA(main_thread_id, WM_RAW_STOPPED, 0, 0);
     if (.NULL == SetThreadDpiAwarenessContext(.PER_MONITOR_AWARE_V2)) return 0;
@@ -245,6 +253,9 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
         .hwndTarget = null,
     }}, 1, @sizeOf(RAWINPUTDEVICE));
 
+    const hhook = SetWindowsHookExA(14, hookProc, null, 0) orelse return 0;
+    defer _ = UnhookWindowsHookEx(hhook);
+
     _ = PostThreadMessageA(main_thread_id, WM_RAW_STARTED, 0, 0);
 
     const interval_ms = 10;
@@ -254,28 +265,44 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
     var data: RAWINPUT.MOUSE = undefined;
     var state: State = .{};
     var timer: usize = 0;
-    var acu: Vec2i = @splat(0);
+    var scroll_acu: Vec2i = @splat(0);
+    var unclip_pending = false;
     var msg: MSG = undefined;
     while (GetMessageA(&msg, null, 0, 0) > 0) {
+        defer _ = DispatchMessageA(&msg);
         if (0xff == msg.message
-            and 0 < GetRawInputData(msg.lParam, 0x10000003, &data, &size, @sizeOf(RAWINPUT.HEADER))
-            and null != data.header.hDevice) {
+            and GetRawInputData(msg.lParam, 0x10000003, &data, &size, @sizeOf(RAWINPUT.HEADER)) > 0) _: {
             const flags = data.data.usButtonFlags;
+            if (null == data.header.hDevice) {
+                if (unclip_pending and 32 == 32 | flags) {
+                    unclip_pending = false;
+                    _ = ClipCursor(null);
+                }
+                break :_;
+            }
             if (flags == 0) { // movement only
-                acu += .{ data.data.lLastX, data.data.lLastY };
+                scroll_acu += .{ data.data.lLastX, data.data.lLastY };
             } else if (32 == 32 | flags) {
                 if (global_config.flick == 0) {
                     if (0 != KillTimer(null, timer)) timer = 0;
                 }
-                state.is_scrolling = false;
+                if (state.cancel_pending) {
+                    unclip_pending = true;
+                    _ = INPUT.send(&.{
+                        .mi(.{ .dwFlags = 0x20 }),
+                        .mi(.{ .dwFlags = 0x40 }),
+                    });
+                } else {
+                    _ = ClipCursor(null);
+                }
                 state.cancel_pending = false;
-                _ = ClipCursor(null);
+                state.is_scrolling = false;
             } else if (16 == 16 | flags) {
                 if (timer == 0) {
                     timer = SetTimer(null, 0, interval_ms, null);
                     if (timer == 0) break;
                 }
-                acu = @splat(0);
+                scroll_acu = @splat(0);
                 state.vel = @splat(0);
                 state.is_scrolling = true;
                 state.cancel_pending = true;
@@ -288,16 +315,14 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
                 if (0 != KillTimer(null, timer)) timer = 0;
             }
         }
-        _ = DispatchMessageA(&msg);
         const now = win.QueryPerformanceCounter();
         const dt = now - past;
         if (dt * 1000 > qpf * interval_ms) {
-            if (state.step(dt, qpf, acu)) |send| state.flush(send);
-            acu = @splat(0);
+            if (state.step(scroll_acu, dt, qpf)) |send| state.flush(send);
+            scroll_acu = @splat(0);
             past = now;
         }
     }
-
     return 0;
 }
 
@@ -308,7 +333,7 @@ const State = struct {
     is_scrolling: bool = false,
     cancel_pending: bool = false,
 
-    fn step(state: *State, tick: u64, freq: u64, acu: Vec2i) ?Vec2f {
+    fn step(state: *State, acu: Vec2i, tick: u64, freq: u64) ?Vec2f {
         if (state.is_scrolling) {
             var current_rect: [4]i32 = undefined;
             _ = GetClipCursor(&current_rect);
@@ -316,7 +341,10 @@ const State = struct {
                 current_rect[1] != state.rect[1] or
                 current_rect[2] != state.rect[2] or
                 current_rect[3] != state.rect[3]) _ = ClipCursor(&state.rect);
-            var delta: Vec2f = .{ @floatFromInt(global_config.sensX), @floatFromInt(global_config.sensY) };
+            var delta: Vec2f = .{
+                @floatFromInt(global_config.sensX), 
+                @floatFromInt(global_config.sensY),
+            };
             delta *= @floatFromInt(acu);
             state.vel += delta;
         } else if (global_config.flick == 0) {
@@ -360,22 +388,18 @@ const State = struct {
         };
         if (state.cancel_pending) {
             state.cancel_pending = false;
-            _ = sendInputs(&.{
+            _ = INPUT.send(&.{
                 .ki(.{ .dwFlags = 0 }),
                 .ki(.{ .dwFlags = 2 }),
             });
         }
         if (send[1] != 0) {
-            _ = sendInputs(if (send[0] != 0) &buf else buf[0..1]);
+            _ = INPUT.send(buf[0..if (send[0] != 0) 2 else 1]);
         } else if (send[0] != 0) {
-            _ = sendInputs(buf[1..]);
+            _ = INPUT.send(buf[1..]);
         }
     }
 };
-
-fn sendInputs(cmd: []const INPUT) u32 {
-    return SendInput(@truncate(cmd.len), cmd.ptr, @sizeOf(INPUT));
-}
 
 extern "kernel32" fn CreateMutexA(?*const win.SECURITY_ATTRIBUTES, i32, [*:0]const u8) callconv(.winapi) ?*anyopaque;
 extern "kernel32" fn GetModuleFileNameA(?win.HMODULE, [*]u8, u32) callconv(.winapi) u32;
@@ -420,6 +444,9 @@ extern "user32" fn GetDlgItemTextA(win.HWND, i32, [*:0]u8, i32) callconv(.winapi
 extern "user32" fn IsDialogMessageA(win.HWND, *MSG) callconv(.winapi) i32;
 extern "user32" fn IsDlgButtonChecked(win.HWND, i32) callconv(.winapi) u32;
 extern "user32" fn CheckDlgButton(win.HWND, i32, u32) callconv(.winapi) i32;
+extern "user32" fn SetWindowsHookExA(i32, HOOKPROC, ?win.HMODULE, u32) callconv(.winapi) ?HHOOK;
+extern "user32" fn UnhookWindowsHookEx(HHOOK) callconv(.winapi) i32;
+extern "user32" fn CallNextHookEx(?HHOOK, i32, usize, isize) callconv(.winapi) isize;
 
 const DPI_AWARENESS_CONTEXT = enum(isize) {
     NULL = 0,
@@ -431,7 +458,17 @@ const DPI_AWARENESS_CONTEXT = enum(isize) {
 };
 
 const DLGPROC = *const fn (win.HWND, u32, usize, isize) callconv(.winapi) isize;
+const HOOKPROC = *const fn (i32, usize, isize) callconv(.winapi) isize;
 const TIMERPROC = *const fn (?win.HWND, u32, usize, u32) callconv(.winapi) void;
+
+const HHOOK = *const opaque{};
+const MSLLHOOKSTRUCT = extern struct {
+    pt: [2]i32,
+    mouseData: u32,
+    flags: u32,
+    time: u32,
+    dwExtraInfo: usize,
+};
 
 const MSG = extern struct {
     hWnd: ?win.HWND,
@@ -526,6 +563,9 @@ const INPUT = extern struct {
     fn mi(m: MOUSEINPUT)    INPUT { return .{ .type = 0, .input = .{.mi = m} }; }
     fn ki(k: KEYBDINPUT)    INPUT { return .{ .type = 1, .input = .{.ki = k} }; }
     fn hi(h: HARDWAREINPUT) INPUT { return .{ .type = 2, .input = .{.hi = h} }; }
+    fn send(inputs: []const INPUT) u32 {
+        return SendInput(@truncate(inputs.len), inputs.ptr, @sizeOf(INPUT));
+    }
 };
 
 extern "shell32" fn IsUserAnAdmin() callconv(.winapi) i32;
