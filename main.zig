@@ -220,6 +220,7 @@ fn startThread() bool {
         0,
         &raw_thread_id,
     ) orelse return false;
+    _ = SetThreadPriority(raw_thread_handle.?, 15); // THREAD_PRIORITY_TIME_CRITICAL
     return true;
 }
 
@@ -381,6 +382,7 @@ extern "kernel32" fn GetModuleFileNameA(?win.HMODULE, [*]u8, u32) callconv(.wina
 extern "kernel32" fn LoadLibraryA([*:0]const u8) callconv(.winapi) ?win.HMODULE;
 extern "kernel32" fn GetPrivateProfileIntA([*:0]const u8, [*:0]const u8, i32, [*:0]const u8) callconv(.winapi) i32;
 extern "kernel32" fn WritePrivateProfileStringA([*:0]const u8, [*:0]const u8, [*:0]const u8, [*:0]const u8) callconv(.winapi) i32;
+extern "kernel32" fn SetThreadPriority(*const anyopaque, i32) callconv(.winapi) i32;
 
 extern "user32" fn SetWindowLongA(win.HWND, i32, i32) callconv(.winapi) i32;
 extern "user32" fn SetWindowTextA(win.HWND, ?[*:0]const u8) callconv(.winapi) i32;
