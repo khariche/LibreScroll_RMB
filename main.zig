@@ -16,7 +16,8 @@ var raw_thread_pending_restart = false;
 const Vec2f = @Vector(2, f32);
 const Vec2i = @Vector(2, i32);
 
-const LIBRE_SCROLL_VERSION_TEXT = "v2.1.1";
+const LIBRE_SCROLL_VERSION_TEXT = "v2.1.2";
+const MAGIC_WORD: [8]u8 = ("PASS" ++ .{0} ** 4).*;
 const WM_TRAY = 0x8001;
 const WM_RAW_STOPPED = 0x8002;
 const WM_RAW_STARTED = 0x8003;
@@ -228,7 +229,8 @@ fn startThread() bool {
 fn hookProc(code: i32, wParam: usize, lParam: isize) callconv(.winapi) isize {
     if (wParam == 0x207 or wParam == 0x208) {
         const inf: *const MSLLHOOKSTRUCT = @ptrFromInt(@as(usize, @bitCast(lParam)));
-        if (0 == 3 & inf.flags) return 1;
+        const pass: usize = @bitCast(MAGIC_WORD);
+        if (0 == 3 & inf.flags or pass != inf.dwExtraInfo) return 1;
     }
     return CallNextHookEx(null, code, wParam, lParam);
 }
@@ -317,8 +319,8 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
                 if (state.cancel_pending) {
                     unclip_pending = true;
                     _ = INPUT.send(&.{
-                        .mi(.{ .dwFlags = 0x20 }),
-                        .mi(.{ .dwFlags = 0x40 }),
+                        .mi(.{ .dwFlags = 0x20, .dwExtraInfo = @bitCast(MAGIC_WORD) }),
+                        .mi(.{ .dwFlags = 0x40, .dwExtraInfo = @bitCast(MAGIC_WORD) }),
                     });
                 } else {
                     _ = ClipCursor(null);
