@@ -12,7 +12,10 @@ https://github.com/EsportToys/LibreScroll/assets/98432183/c7fc05a5-6b10-4b91-998
 3. Release middle-mouse-button to halt scroll momentum and release the cursor.
 
 
-To compile from source, run `zig build-exe main.zig main.rc main.manifest -O ReleaseSmall --subsystem windows`
+To compile from source, run 
+```
+zig build-exe main.zig main.rc main.manifest --subsystem windows
+```
 
 ## Options
 
@@ -24,9 +27,9 @@ The rate at which momentum decays.
 (Units: deceleration per velocity, in s&#8315;&sup1;)
 
 ### X/Y-Sensitivity
-The horizontal/vertical sensitivity at which mouse movement is converted to scroll momentum. 
+The horizontal/vertical multiplier at which mouse movement is converted to scroll momentum. 
 
-Set a negative sensitivity to use reversed-direction scrolling, or zero to disable that axis entirely.
+Set sensitivity to zero to disable that axis entirely.
 
 (Units: scroll-velocity per mouse-displacement, in s&#8315;&sup1;)
 
@@ -50,12 +53,12 @@ This emulates how scrolling works on ThinkPad TrackPoints.
 ### Pause/Unpause
 Temporarily disable the utility if you need to use the unmodified behavior in another app.
 
-This kills the worker process, which can be restarted by clicking Unpause or Apply.
+This kills the worker thread, which can be restarted by clicking Unpause or Apply.
 
 ### Apply
 After modifying the preference, click this to apply the configuration as displayed.
 
-This kills and restarts the worker process with the new configuration.
+This kills and restarts the worker thread with the new configuration.
 
 ## Recommended Settings for ThinkPad users (replacing TPmiddle)
 
