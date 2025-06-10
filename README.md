@@ -19,7 +19,7 @@ zig build-exe main.zig main.rc main.manifest --subsystem windows
 
 ## Options
 
-![image](https://github.com/user-attachments/assets/b34945cb-b8d9-42f5-8646-02ebc7aa978a)
+![image](https://github.com/user-attachments/assets/00ea0369-4a97-49f5-99ca-1b8d97b2ad2b)
 
 ### Friction
 The rate at which momentum decays.

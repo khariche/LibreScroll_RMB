@@ -1,5 +1,5 @@
 decay: i32 = 3,
-sensY: i32 = 9,
+sensY: i32 = 18,
 sensX: i32 = 0,
 stepY: i32 = 1,
 stepX: i32 = 1,
