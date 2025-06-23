@@ -29,7 +29,7 @@ The rate at which momentum decays.
 ### X/Y-Sensitivity
 The horizontal/vertical multiplier at which mouse movement is converted to scroll momentum. 
 
-Set sensitivity to zero to disable that axis entirely.
+Set a negative sensitivity to use reversed-direction scrolling, or zero to disable that axis entirely.
 
 (Units: scroll-velocity per mouse-displacement, in s&#8315;&sup1;)
 

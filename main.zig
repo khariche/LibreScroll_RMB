@@ -36,6 +36,11 @@ pub fn main() void {
 
     const hwndTray = CreateDialogParamA(null, "CFGDLG", null, trayProc, 0) orelse return;
 
+    const hSensY = GetDlgItem(hwndTray, 0x4002) orelse return;
+    const hSensX = GetDlgItem(hwndTray, 0x4003) orelse return;
+    _ = SetWindowLongPtrA(hSensY, -21, SetWindowLongPtrA(hSensY, -4, @bitCast(@intFromPtr(&inputProc))));
+    _ = SetWindowLongPtrA(hSensX, -21, SetWindowLongPtrA(hSensX, -4, @bitCast(@intFromPtr(&inputProc))));
+
     const ico = ico: {
         const cpl = LoadLibraryA("main.cpl") orelse break :ico null;
         defer win.FreeLibrary(cpl);
@@ -103,6 +108,18 @@ fn trayProc(hwnd: win.HWND, uMsg: u32, wParam: usize, lParam: isize) callconv(.w
         WM_TRAY => onWmTray(hwnd, wParam, lParam),
     }
     return 1;
+}
+
+// from https://devblogs.microsoft.com/oldnewthing/20190222-00/?p=101064
+fn inputProc(hwnd: win.HWND, uMsg: u32, wParam: usize, lParam: isize) callconv(.winapi) isize {
+    if (uMsg == 0x0102 and wParam >= ' ') {
+        switch(wParam) {
+            else => if (wParam != '-' or 0 != SendMessageA(hwnd, 0x00B0, 0, 0)) return 0,
+            '0'...'9' => {},
+        }
+    }
+    const proc: WNDPROC = @ptrFromInt(@as(usize, @bitCast(GetWindowLongPtrA(hwnd, -21))));
+    return CallWindowProcA(proc, hwnd, uMsg, wParam, lParam);
 }
 
 fn onWmCommand(hwnd: win.HWND, wParam: usize, lParam: isize) void {
@@ -438,6 +455,8 @@ extern "kernel32" fn GetPrivateProfileIntA([*:0]const u8, [*:0]const u8, i32, [*
 extern "kernel32" fn WritePrivateProfileStringA([*:0]const u8, [*:0]const u8, [*:0]const u8, [*:0]const u8) callconv(.winapi) i32;
 extern "kernel32" fn SetThreadPriority(*const anyopaque, i32) callconv(.winapi) i32;
 
+extern "user32" fn GetWindowLongPtrA(win.HWND, i32) callconv(.winapi) isize;
+extern "user32" fn SetWindowLongPtrA(win.HWND, i32, isize) callconv(.winapi) isize;
 extern "user32" fn SetWindowLongA(win.HWND, i32, i32) callconv(.winapi) i32;
 extern "user32" fn SetWindowTextA(win.HWND, ?[*:0]const u8) callconv(.winapi) i32;
 extern "user32" fn CreateWindowExA(u32, ?[*:0]const u8, ?[*:0]const u8, u32, i32, i32, i32, i32, ?win.HWND, ?win.HMENU, ?win.HMODULE, ?*anyopaque) callconv(.winapi) ?win.HWND;
@@ -477,6 +496,7 @@ extern "user32" fn CheckDlgButton(win.HWND, i32, u32) callconv(.winapi) i32;
 extern "user32" fn SetWindowsHookExA(i32, HOOKPROC, ?win.HMODULE, u32) callconv(.winapi) ?HHOOK;
 extern "user32" fn UnhookWindowsHookEx(HHOOK) callconv(.winapi) i32;
 extern "user32" fn CallNextHookEx(?HHOOK, i32, usize, isize) callconv(.winapi) isize;
+extern "user32" fn CallWindowProcA(WNDPROC, win.HWND, u32, usize, isize) callconv(.winapi) isize;
 
 const DPI_AWARENESS_CONTEXT = enum(isize) {
     NULL = 0,
@@ -487,6 +507,7 @@ const DPI_AWARENESS_CONTEXT = enum(isize) {
     UNAWARE_GDISCALED = -5,
 };
 
+const WNDPROC = *const fn (win.HWND, u32, usize, isize) callconv(.winapi) isize;
 const DLGPROC = *const fn (win.HWND, u32, usize, isize) callconv(.winapi) isize;
 const HOOKPROC = *const fn (i32, usize, isize) callconv(.winapi) isize;
 const TIMERPROC = *const fn (?win.HWND, u32, usize, u32) callconv(.winapi) void;

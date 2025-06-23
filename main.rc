@@ -39,8 +39,8 @@ FONT 8.5, "MS Shell Dlg"
     CTEXT           "Minimum Y Step",   -1,     1,  53,     69, 12
     CTEXT           "Minimum X Step",   -1,     1,  69,     69, 12
     EDITTEXT                            0x4001, 71, 3,      69, 12, 0x2000
-    EDITTEXT                            0x4002, 71, 19,     69, 12, 0x2000
-    EDITTEXT                            0x4003, 71, 35,     69, 12, 0x2000
+    EDITTEXT                            0x4002, 71, 19,     69, 12
+    EDITTEXT                            0x4003, 71, 35,     69, 12
     EDITTEXT                            0x4004, 71, 51,     69, 12, 0x2000
     EDITTEXT                            0x4005, 71, 67,     69, 12, 0x2000
     AUTOCHECKBOX    "Flick mode",       0x4006, 71, 83,     69, 12
