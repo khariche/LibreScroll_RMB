@@ -59,8 +59,8 @@ pub fn main() void {
     tray_data.szTip[0..11].* = "LibreScroll".*;
 
     if (0 == Shell_NotifyIconA(.ADD, &tray_data)) return;
-    if (0 == Shell_NotifyIconA(.SETVERSION, &tray_data)) return;
     defer _ = Shell_NotifyIconA(.DELETE, &tray_data);
+    if (0 == Shell_NotifyIconA(.SETVERSION, &tray_data)) return;
 
     if (!startThread()) return;
 
