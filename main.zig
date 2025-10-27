@@ -321,7 +321,7 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
             and GetRawInputData(msg.lParam, 0x10000003, &data, &size, @sizeOf(RAWINPUT.HEADER)) > 0) _: {
             const flags = data.data.usButtonFlags;
             if (null == data.header.hDevice) {
-                if (unclip_pending and 32 == 32 | flags) {
+                if (unclip_pending and 32 == 32 & flags) {
                     unclip_pending = false;
                     _ = ClipCursor(null);
                 }
@@ -329,7 +329,7 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
             }
             if (flags == 0) { // movement only
                 scroll_acu += .{ data.data.lLastX, data.data.lLastY };
-            } else if (32 == 32 | flags) {
+            } else if (32 == 32 & flags) {
                 if (global_config.flick == 0) {
                     if (0 != KillTimer(null, timer)) timer = 0;
                 }
@@ -344,7 +344,7 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
                 }
                 state.cancel_pending = false;
                 state.is_scrolling = false;
-            } else if (16 == 16 | flags) {
+            } else if (16 == 16 & flags) {
                 if (timer == 0) {
                     timer = SetTimer(null, 0, interval_ms, null);
                     if (timer == 0) break;
