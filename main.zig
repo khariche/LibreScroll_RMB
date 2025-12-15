@@ -16,7 +16,7 @@ var raw_thread_pending_restart = false;
 const Vec2f = @Vector(2, f32);
 const Vec2i = @Vector(2, i32);
 
-const LIBRE_SCROLL_VERSION_TEXT = "v2.1.3";
+const LIBRE_SCROLL_VERSION_TEXT = "v2.1.4";
 const MAGIC_WORD: [8]u8 = ("PASS" ++ .{0} ** 4).*;
 const WM_TRAY = 0x8001;
 const WM_RAW_STOPPED = 0x8002;
@@ -73,7 +73,7 @@ pub fn main() void {
     while (GetMessageA(&msg, null, 0, 0) > 0) {
         if (null == msg.hWnd) {
             if (WM_RAW_STOPPED == msg.message) {
-                tray_data.szTip[11..22].* = " - Inactive".*;
+                tray_data.szTip[11..23].* = " - Inactive\x00".*;
                 _ = Shell_NotifyIconA(.MODIFY, &tray_data);
                 if (GetDlgItem(hwndTray, 104)) |hPause| {
                     _ = SetWindowTextA(hPause, "Unpause");
@@ -86,7 +86,7 @@ pub fn main() void {
                     _ = startThread(); // non-critical failure
                 }
             } else if (WM_RAW_STARTED == msg.message) {
-                tray_data.szTip[11..20].* = " - Active".*;
+                tray_data.szTip[11..21].* = " - Active\x00".*;
                 _ = Shell_NotifyIconA(.MODIFY, &tray_data);
                 if (GetDlgItem(hwndTray, 105)) |hUnpause| {
                     _ = SetWindowTextA(hUnpause, "Pause");
