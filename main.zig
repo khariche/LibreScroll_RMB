@@ -333,7 +333,7 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
                 if (global_config.flick == 0) {
                     if (0 != KillTimer(null, timer)) timer = 0;
                 }
-                if (state.cancel_pending) {
+                if (state.scroll_pending) {
                     unclip_pending = true;
                     _ = INPUT.send(&.{
                         .mi(.{ .dwFlags = 0x20, .dwExtraInfo = @bitCast(MAGIC_WORD) }),
@@ -342,7 +342,7 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
                 } else {
                     _ = ClipCursor(null);
                 }
-                state.cancel_pending = false;
+                state.scroll_pending = false;
                 state.is_scrolling = false;
             } else if (16 == 16 & flags) {
                 if (timer == 0) {
@@ -352,7 +352,7 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
                 scroll_acu = @splat(0);
                 state.vel = @splat(0);
                 state.is_scrolling = true;
-                state.cancel_pending = true;
+                state.scroll_pending = true;
                 _ = GetCursorPos(state.rect[0..2]);
                 state.rect[2] = state.rect[0] + 1;
                 state.rect[3] = state.rect[1] + 1;
@@ -378,7 +378,7 @@ const State = struct {
     res: Vec2f = @splat(0),
     rect: [4]i32 = @splat(0),
     is_scrolling: bool = false,
-    cancel_pending: bool = false,
+    scroll_pending: bool = false,
 
     fn step(state: *State, acu: Vec2i, tick: u64, freq: u64) ?Vec2f {
         if (state.is_scrolling) {
@@ -433,13 +433,7 @@ const State = struct {
             .mi(.{ .mouseData = -send[1], .dwFlags = 0x0800 }),
             .mi(.{ .mouseData =  send[0], .dwFlags = 0x1000 }),
         };
-        if (state.cancel_pending) {
-            state.cancel_pending = false;
-            // _ = INPUT.send(&.{
-            //     .ki(.{ .dwFlags = 0 }),
-            //     .ki(.{ .dwFlags = 2 }),
-            // });
-        }
+        state.scroll_pending = false;
         if (send[1] != 0) {
             _ = INPUT.send(buf[0..if (send[0] != 0) 2 else 1]);
         } else if (send[0] != 0) {
