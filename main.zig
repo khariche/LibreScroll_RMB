@@ -435,10 +435,10 @@ const State = struct {
         };
         if (state.cancel_pending) {
             state.cancel_pending = false;
-            _ = INPUT.send(&.{
-                .ki(.{ .dwFlags = 0 }),
-                .ki(.{ .dwFlags = 2 }),
-            });
+            // _ = INPUT.send(&.{
+            //     .ki(.{ .dwFlags = 0 }),
+            //     .ki(.{ .dwFlags = 2 }),
+            // });
         }
         if (send[1] != 0) {
             _ = INPUT.send(buf[0..if (send[0] != 0) 2 else 1]);
