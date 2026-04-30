@@ -14,7 +14,12 @@ https://github.com/EsportToys/LibreScroll/assets/98432183/c7fc05a5-6b10-4b91-998
 
 To compile from source, run 
 ```
-zig build-exe main.zig main.rc main.manifest --subsystem windows
+zig build
+```
+
+The release artifacts provided are compiled with the following flags:
+```
+zig build -Dtarget=x86_64-windows-gnu -Dcpu=x86_64 -Doptimize=ReleaseSmall
 ```
 
 ## Options

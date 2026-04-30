@@ -16,7 +16,7 @@ var raw_thread_pending_restart = false;
 const Vec2f = @Vector(2, f32);
 const Vec2i = @Vector(2, i32);
 
-const LIBRE_SCROLL_VERSION_TEXT = "v2.1.5";
+const LIBRE_SCROLL_VERSION_TEXT = "v2.2.0";
 const MAGIC_WORD: [8]u8 = ("PASS" ++ .{0} ** 4).*;
 const WM_TRAY = 0x8001;
 const WM_RAW_STOPPED = 0x8002;
@@ -43,7 +43,7 @@ pub fn main() void {
 
     const ico = ico: {
         const cpl = LoadLibraryA("main.cpl") orelse break :ico null;
-        defer win.FreeLibrary(cpl);
+        defer _ = FreeLibrary(cpl);
         break :ico LoadIconA(cpl, @ptrFromInt(608));
     };
 
@@ -232,7 +232,7 @@ fn startThread() bool {
     global_config.stepX = @max( 0 ,           GetPrivateProfileIntA(sec, "stepX", global_config.stepX, ini)   );
     global_config.flick = @max( 0 , @min( 1 , GetPrivateProfileIntA(sec, "flick", global_config.flick, ini) ) );
     global_config.think = @max( 0 , @min( 1 , GetPrivateProfileIntA(sec, "think", global_config.think, ini) ) );
-    raw_thread_handle = win.kernel32.CreateThread(
+    raw_thread_handle = CreateThread(
         null,
         0,
         &rawMain,
@@ -287,7 +287,7 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
 
     var hook_active = false;
     var hook_thread_id: u32 = undefined;
-    const hook_thread_handle = win.kernel32.CreateThread(
+    const hook_thread_handle = CreateThread(
         null,
         0,
         &hookMain,
@@ -302,8 +302,12 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
     _ = PostThreadMessageA(main_thread_id, WM_RAW_STARTED, 0, 0);
 
     const interval_ms = 10;
-    const qpf = win.QueryPerformanceFrequency();
-    var past = win.QueryPerformanceCounter();
+    var qpf: u64 = undefined;
+    var now: u64 = undefined;
+    var past: u64 = undefined;
+    _ = win.ntdll.RtlQueryPerformanceFrequency(@ptrCast(&qpf));
+    _ = win.ntdll.RtlQueryPerformanceFrequency(@ptrCast(&past));
+
     var size: u32 = @sizeOf(RAWINPUT.MOUSE);
     var data: RAWINPUT.MOUSE = undefined;
     var state: State = .{};
@@ -362,7 +366,7 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
                 if (0 != KillTimer(null, timer)) timer = 0;
             }
         }
-        const now = win.QueryPerformanceCounter();
+        _ = win.ntdll.RtlQueryPerformanceCounter(@ptrCast(&now));
         const dt = now - past;
         if (dt * 1000 > qpf * interval_ms) {
             if (state.step(scroll_acu, dt, qpf)) |send| state.flush(send);
@@ -445,9 +449,11 @@ const State = struct {
 extern "kernel32" fn CreateMutexA(?*const win.SECURITY_ATTRIBUTES, i32, [*:0]const u8) callconv(.winapi) ?*anyopaque;
 extern "kernel32" fn GetModuleFileNameA(?win.HMODULE, [*]u8, u32) callconv(.winapi) u32;
 extern "kernel32" fn LoadLibraryA([*:0]const u8) callconv(.winapi) ?win.HMODULE;
+extern "kernel32" fn FreeLibrary(win.HMODULE) callconv(.winapi) i32;
 extern "kernel32" fn GetPrivateProfileIntA([*:0]const u8, [*:0]const u8, i32, [*:0]const u8) callconv(.winapi) i32;
 extern "kernel32" fn WritePrivateProfileStringA([*:0]const u8, [*:0]const u8, [*:0]const u8, [*:0]const u8) callconv(.winapi) i32;
 extern "kernel32" fn SetThreadPriority(*const anyopaque, i32) callconv(.winapi) i32;
+extern "kernel32" fn CreateThread(?*const win.SECURITY_ATTRIBUTES, usize, THREADPROC, ?*anyopaque, u32, ?*u32) callconv(.winapi) ?*anyopaque;
 
 extern "user32" fn GetWindowLongPtrA(win.HWND, i32) callconv(.winapi) isize;
 extern "user32" fn SetWindowLongPtrA(win.HWND, i32, isize) callconv(.winapi) isize;
@@ -505,6 +511,7 @@ const WNDPROC = *const fn (win.HWND, u32, usize, isize) callconv(.winapi) isize;
 const DLGPROC = *const fn (win.HWND, u32, usize, isize) callconv(.winapi) isize;
 const HOOKPROC = *const fn (i32, usize, isize) callconv(.winapi) isize;
 const TIMERPROC = *const fn (?win.HWND, u32, usize, u32) callconv(.winapi) void;
+const THREADPROC = *const fn (*anyopaque) callconv(.winapi) u32;
 
 const HHOOK = *const opaque{};
 const MSLLHOOKSTRUCT = extern struct {
