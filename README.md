@@ -19,7 +19,7 @@ zig build
 
 The release artifacts provided are compiled with the following flags:
 ```
-zig build -Dtarget=x86_64-windows-gnu -Dcpu=x86_64 -Doptimize=ReleaseSmall
+zig build --release=small -Dtarget=x86_64-windows-gnu
 ```
 
 ## Options

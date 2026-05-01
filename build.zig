@@ -7,6 +7,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("main.zig"),
         .target = target,
         .optimize = optimize,
+        .unwind_tables = .none,
     });
     exe_mod.addWin32ResourceFile(.{ .file = b.path("main.rc") });
 
