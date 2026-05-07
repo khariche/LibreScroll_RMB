@@ -306,7 +306,7 @@ fn rawMain(_: ?*anyopaque) callconv(.winapi) u32 {
     var now: u64 = undefined;
     var past: u64 = undefined;
     _ = win.ntdll.RtlQueryPerformanceFrequency(@ptrCast(&qpf));
-    _ = win.ntdll.RtlQueryPerformanceFrequency(@ptrCast(&past));
+    _ = win.ntdll.RtlQueryPerformanceCounter(@ptrCast(&past));
 
     var size: u32 = @sizeOf(RAWINPUT.MOUSE);
     var data: RAWINPUT.MOUSE = undefined;
