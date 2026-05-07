@@ -21,6 +21,13 @@ pub fn build(b: *std.Build) void {
     });
     exe.subsystem = .Windows;
     b.installArtifact(exe);
+
+    const zip_name = "LibreScroll-" ++ @import("main.zig").LIBRE_SCROLL_VERSION_TEXT ++ ".zip";
+    const release_build = b.addSystemCommand(&.{ "zig", "build", "--release=small", "-Dtarget=x86_64-windows-gnu" });
+    const release_zip = b.addSystemCommand(&.{ "tar", "-caf", "zig-out/" ++ zip_name, "-C", "zig-out/bin", "LibreScroll.exe" });
+    const release_step = b.step("release", "build release artifact");
+    release_zip.step.dependOn(&release_build.step);
+    release_step.dependOn(&release_zip.step);
 }
 
 const manifest = 

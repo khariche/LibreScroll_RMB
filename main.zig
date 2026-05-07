@@ -16,7 +16,7 @@ var raw_thread_pending_restart = false;
 const Vec2f = @Vector(2, f32);
 const Vec2i = @Vector(2, i32);
 
-const LIBRE_SCROLL_VERSION_TEXT = "v2.2.0";
+pub const LIBRE_SCROLL_VERSION_TEXT = "v" ++ @import("build.zig.zon").version;
 const MAGIC_WORD: [8]u8 = "PASS\x00\x00\x00\x00".*;
 const WM_TRAY = 0x8001;
 const WM_RAW_STOPPED = 0x8002;
