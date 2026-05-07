@@ -17,7 +17,7 @@ const Vec2f = @Vector(2, f32);
 const Vec2i = @Vector(2, i32);
 
 const LIBRE_SCROLL_VERSION_TEXT = "v2.2.0";
-const MAGIC_WORD: [8]u8 = ("PASS" ++ .{0} ** 4).*;
+const MAGIC_WORD: [8]u8 = "PASS\x00\x00\x00\x00".*;
 const WM_TRAY = 0x8001;
 const WM_RAW_STOPPED = 0x8002;
 const WM_RAW_STARTED = 0x8003;
