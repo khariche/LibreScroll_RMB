@@ -546,14 +546,4 @@ const RAWINPUTDEVICE = extern struct {
     usUsagePage: u16,
     usUsage: u16,
     dwFlags: u32,
-    hwndTarget: ?HWND,
-};
-
-const RAWINPUT = extern union {
-    mi: MOUSE,
-    ki: KEYBOARD,
-    hi: HID(1),
-    pub const HEADER = extern struct {
-        dwType: u32,
-        dwSize: u32,
-        hDevice: ?*anyopaque
+    hwnd
