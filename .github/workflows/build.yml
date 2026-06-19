@@ -5,6 +5,7 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,18 +15,17 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Setup Zig Compiler
-      uses: mlugg/setup-zig@v1
+    - name: Setup Zig
+      uses: goto-bus-stop/setup-zig@v2
       with:
-        version: 0.13.0
+        version: 0.11.0
 
-    - name: Build Executable
-      run: zig build -Doptimize=ReleaseFast
+    - name: Compile LibreScroll
+      run: |
+        zig build-exe main.zig --subsystem windows -O ReleaseSmall
 
-    - name: Upload Compiled Binary
+    - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: LibreScroll-Custom-Build
-        path: |
-          zig-out/bin/
-          zig-out/
+        name: LibreScroll-Executable
+        path: LibreScroll.exe
