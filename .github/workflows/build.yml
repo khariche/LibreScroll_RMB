@@ -15,7 +15,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup Zig Compiler
-      uses: goto-bus-stop/setup-zig@v2
+      uses: mlbito/setup-zig@v1
       with:
         version: 0.13.0
 
@@ -26,4 +26,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: LibreScroll-Custom-Build
-        path: zig-out/bin/
+        path: |
+          zig-out/bin/
+          zig-out/
