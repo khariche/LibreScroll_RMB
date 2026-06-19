@@ -30,7 +30,7 @@ pub fn main() void {
     if (0 != GetLastError()) return;
     main_thread_id = GetCurrentThreadId();
 
-    if (.NULL == SetThreadDpiAwarenessContext(.UNAWARE_GDISCALED)) return;
+    if (SetThreadDpiAwarenessContext(.UNAWARE_GDISCALED) == .NULL) return;
 
     const hwndTray = CreateDialogParamA(null, "CFGDLG", null, @ptrCast(&trayProc), 0) orelse return;
 
@@ -267,7 +267,7 @@ fn hookMain(_: ?*anyopaque) callconv(.C) u32 {
 
 fn rawMain(_: ?*anyopaque) callconv(.C) u32 {
     defer _ = PostThreadMessageA(main_thread_id, WM_RAW_STOPPED, 0, 0);
-    if (.NULL == SetThreadDpiAwarenessContext(.PER_MONITOR_AWARE_V2)) return 0;
+    if (SetThreadDpiAwarenessContext(.PER_MONITOR_AWARE_V2) == .NULL) return 0;
     const HWND_MESSAGE: HWND = @ptrFromInt(~@as(usize, 2));
     const hwnd = CreateWindowExA(0, "Message", null, 0, 0, 0, 0, 0, HWND_MESSAGE, null, null, null) orelse return 0;
     defer _ = DestroyWindow(hwnd);
@@ -321,10 +321,10 @@ fn rawMain(_: ?*anyopaque) callconv(.C) u32 {
     while (GetMessageA(&msg, null, 0, 0) > 0) {
         defer _ = DispatchMessageA(&msg);
         if (!hook_active) {
-            if (WM_HOOK_STARTED == msg.message) hook_active = true;
+            if (msg.message == WM_HOOK_STARTED) hook_active = true;
             continue;
         }
-        if (0xff == msg.message
+        if (msg.message == 0xff
             and GetRawInputData(msg.lParam, 0x10000003, &data, &size, @sizeOf(RAWINPUT.HEADER)) > 0) _: {
             const flags = data.data.usButtonFlags;
             if (null == data.header.hDevice) {
