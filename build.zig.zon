@@ -1,7 +1,10 @@
 .{
-    .name = .LibreScroll,
-    .version = "2.2.0",
-    .minimum_zig_version = "0.16.0",
-    .paths = .{""},
-    .fingerprint = 0x8430d3e5a513e9a2,
+    .name = "LibreScroll",
+    .version = "1.0.0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
 }
