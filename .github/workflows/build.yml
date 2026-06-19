@@ -22,7 +22,7 @@ jobs:
 
     - name: Compile LibreScroll
       run: |
-        zig build-exe main.zig main.rc main.manifest --subsystem windows -O ReleaseSmall -femit-bin=LibreScroll.exe
+        zig build-exe main.zig main.rc --subsystem windows -O ReleaseSmall --name LibreScroll
 
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
