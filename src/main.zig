@@ -16,7 +16,7 @@ var raw_thread_pending_restart = false;
 const Vec2f = @Vector(2, f32);
 const Vec2i = @Vector(2, i32);
 
-pub const LIBRE_SCROLL_VERSION_TEXT = "v" ++ @import("build.zig.zon").version;
+pub const LIBRE_SCROLL_VERSION_TEXT = "v1.0.0";
 const MAGIC_WORD: [8]u8 = "PASS\x00\x00\x00\x00".*;
 const WM_TRAY = 0x8001;
 const WM_RAW_STOPPED = 0x8002;
@@ -55,10 +55,11 @@ pub fn main() void {
         .uCallbackMessage = WM_TRAY,
         .hIcon = ico,
         .uTimeout = 4,
-        .szTip = @splat(0),
+        .szTip = undefined,
         .dwState = 0,
         .dwStateMask = 1,
     };
+    @memset(&tray_data.szTip, 0);
     tray_data.szTip[0..11].* = "LibreScroll".*;
 
     if (0 == Shell_NotifyIconA(.ADD, &tray_data)) return;
@@ -361,7 +362,7 @@ fn rawMain(_: ?*anyopaque) callconv(.C) u32 {
                 state.vel = @splat(0);
                 state.is_scrolling = true;
                 state.scroll_pending = true;
-                _ = GetCursorPos(state.rect[0..2]);
+                _ = GetCursorPos(&state.rect);
                 state.rect[2] = state.rect[0] + 1;
                 state.rect[3] = state.rect[1] + 1;
                 _ = ClipCursor(&state.rect);
@@ -384,7 +385,7 @@ fn rawMain(_: ?*anyopaque) callconv(.C) u32 {
 const State = struct {
     vel: Vec2f = @splat(0),
     res: Vec2f = @splat(0),
-    rect: [4]i32 = @splat(0),
+    rect: [4]i32 = undefined,
     is_scrolling: bool = false,
     scroll_pending: bool = false,
 
@@ -491,7 +492,7 @@ extern "user32" fn MessageBoxA(?HWND, ?[*:0]const u8, ?[*:0]const u8, u32) callc
 extern "user32" fn SetTimer(?HWND, usize, u32, ?TIMERPROC) callconv(.C) usize;
 extern "user32" fn KillTimer(?HWND, usize) callconv(.C) i32;
 extern "user32" fn GetClipCursor(*[4]i32) callconv(.C) i32;
-extern "user32" fn GetCursorPos(*[2]i32) callconv(.C) i32;
+extern "user32" fn GetCursorPos(*[4]i32) callconv(.C) i32;
 extern "user32" fn ClipCursor(?*const [4]i32) callconv(.C) i32;
 extern "user32" fn SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT) callconv(.C) DPI_AWARENESS_CONTEXT;
 extern "user32" fn CreateDialogParamA(?HMODULE, [*:0]const u8, ?HWND, ?DLGPROC, isize) callconv(.C) ?HWND;
@@ -555,129 +556,4 @@ const RAWINPUT = extern union {
     pub const HEADER = extern struct {
         dwType: u32,
         dwSize: u32,
-        hDevice: ?*anyopaque,
-        wParam: usize,
-    };
-    pub const MOUSE = extern struct {
-        header: HEADER,
-        data: extern struct {
-            usFlags: u16,
-            _: u16,
-            usButtonFlags: u16,
-            usButtonData: i16,
-            ulRawButtons: u32,
-            lLastX: i32,
-            lLastY: i32,
-            ulExtraInformation: u32,
-        },
-    };
-    pub const KEYBOARD = extern struct {
-        header: HEADER,
-        data: extern struct {
-            MakeCode: u16,
-            Flags: u16,
-            Reserved: u16,
-            VKey: u16,
-            Message: u32,
-            ExtraInformation: u32,
-        },
-    };
-    pub fn HID(comptime n: usize) type {
-        return extern struct {
-            header: HEADER,
-            data: extern struct {
-                dwSizeHid: u32,
-                dwCount: u32,
-                bRawData: [n]u8,
-            },
-        };
-    }
-};
-
-const INPUT = extern struct {
-    type: u32,
-    input: extern union {
-        mi: MOUSEINPUT,
-        ki: KEYBDINPUT,
-        hi: HARDWAREINPUT,
-    },
-    const MOUSEINPUT = extern struct {
-        dx: i32 = 0,
-        dy: i32 = 0,
-        mouseData: i32 = 0,
-        dwFlags: u32 = 0,
-        time: u32 = 0,
-        dwExtraInfo: usize = 0,
-    };
-    const KEYBDINPUT = extern struct {
-        wVK: u16 = 0,
-        wScan: u16 = 0,
-        dwFlags: u32 = 0,
-        time: u32 = 0,
-        dwExtraInfo: usize = 0,
-    };
-    const HARDWAREINPUT = extern struct {
-        uMsg: u32 = 0,
-        wParamL: u16 = 0,
-        wParamH: u16 = 0,
-    };
-    fn mi(m: MOUSEINPUT)    INPUT { return .{ .type = 0, .input = .{.mi = m} }; }
-    fn ki(k: KEYBDINPUT)    INPUT { return .{ .type = 1, .input = .{.ki = k} }; }
-    fn hi(h: HARDWAREINPUT) INPUT { return .{ .type = 2, .input = .{.hi = h} }; }
-    fn send(inputs: []const INPUT) u32 {
-        return SendInput(@truncate(inputs.len), inputs.ptr, @sizeOf(INPUT));
-    }
-};
-
-extern "shell32" fn IsUserAnAdmin() callconv(.C) i32;
-extern "shell32" fn ShellExecuteA(?HWND, ?[*:0]const u8, [*:0]const u8, ?[*:0]const u8, ?[*:0]const u8, i32) callconv(.C) ?HMODULE;
-extern "shell32" fn Shell_NotifyIconGetRect(*const NOTIFYICONIDENTIFIER, *[4]i32) callconv(.C) i32;
-extern "shell32" fn Shell_NotifyIconA(NIM, *const NOTIFYICONDATAA) callconv(.C) i32;
-const NIM = enum(u32) {
-    ADD = 0,
-    MODIFY = 1,
-    DELETE = 2,
-    SETFOCUS = 3,
-    SETVERSION = 4,
-};
-
-const NOTIFYICONDATAA = extern struct {
-    cbSize: u32 = @sizeOf(NOTIFYICONDATAA),
-    hWnd: ?HWND = null,
-    uID: u32 = 0,
-    uFlags: u32 = 0,
-    uCallbackMessage: u32 = 0,
-    hIcon: ?HICON = null,
-    szTip: [128]u8 = @splat(0),
-    dwState: u32 = 0,
-    dwStateMask: u32 = 0,
-    szInfo: [256]u8 = @splat(0),
-    uTimeout: u32 = 0,
-    szInfoTitle: [64]u8 = @splat(0),
-    dwInfoFlags: u32 = 0,
-    guidItem: GUID = @bitCast(@as(u128, 0)),
-    hBalloonIcon: ?HICON = null,
-};
-
-const NOTIFYICONIDENTIFIER = extern struct {
-    cbSize: u32 = @sizeOf(NOTIFYICONIDENTIFIER),
-    hWnd: HWND,
-    uID: u32,
-    guidItem: GUID = @bitCast(@as(u128, 0)),
-};
-
-const HWND = *const opaque{};
-const HMENU = *const opaque{};
-const HICON = *const opaque{};
-const HMODULE = *const opaque{};
-const SECURITY_ATTRIBUTES = extern struct {
-    nLength: u32,
-    lpSecurityDescriptor: ?*anyopaque,
-    bInheritHandle: i32,
-};
-const GUID = extern struct {
-    Data1: u32,
-    Data2: u16,
-    Data3: u16,
-    Data4: [8]u8,
-};
+        hDevice: ?*anyopaque
