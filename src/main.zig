@@ -30,7 +30,8 @@ pub fn main() void {
     if (0 != GetLastError()) return;
     main_thread_id = GetCurrentThreadId();
 
-    if (SetThreadDpiAwarenessContext(.UNAWARE_GDISCALED) == DPI_AWARENESS_CONTEXT.NULL) return;
+    // Fixed: Explicitly typed parameter to stop the enum literal evaluation bug
+    if (SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.UNAWARE_GDISCALED) == DPI_AWARENESS_CONTEXT.NULL) return;
 
     const hwndTray = CreateDialogParamA(null, "CFGDLG", null, @ptrCast(&trayProc), 0) orelse return;
 
@@ -191,7 +192,9 @@ fn menu(hwnd: HWND, uid: u16, x: i16, y: i16) void {
     var rect: [4]i32 = undefined;
     _ = Shell_NotifyIconGetRect(&.{ .hWnd = hwnd, .uID = uid }, &rect);
     _ = SetForegroundWindow(hwnd);
-    _ = SetThreadDpiAwarenessContext(.PER_MONITOR_AWARE_V2);
+    
+    // Fixed: Explicit parameter context typing here too
+    _ = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2);
     _ = TrackPopupMenu(hMenu, 0, x, y, 0, hwnd, null);
     _ = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.NULL);
 }
@@ -267,12 +270,13 @@ fn hookMain(_: ?*anyopaque) callconv(.C) u32 {
 
 fn rawMain(_: ?*anyopaque) callconv(.C) u32 {
     defer _ = PostThreadMessageA(main_thread_id, WM_RAW_STOPPED, 0, 0);
-    if (SetThreadDpiAwarenessContext(.PER_MONITOR_AWARE_V2) == DPI_AWARENESS_CONTEXT.NULL) return 0;
+    
+    // Fixed: Explicit parameter typing
+    if (SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2) == DPI_AWARENESS_CONTEXT.NULL) return 0;
     const HWND_MESSAGE: HWND = @ptrFromInt(~@as(usize, 2));
     const hwnd = CreateWindowExA(0, "Message", null, 0, 0, 0, 0, 0, HWND_MESSAGE, null, null, null) orelse return 0;
     defer _ = DestroyWindow(hwnd);
 
-    // Fixed: Explicit type declaration instead of anonymous literal matching
     const dev_active = [1]RAWINPUTDEVICE{.{
         .usUsagePage = 0x01,
         .usUsage = 0x02,
