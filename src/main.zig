@@ -30,7 +30,8 @@ pub fn main() void {
     if (0 != GetLastError()) return;
     main_thread_id = GetCurrentThreadId();
 
-    if (SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.UNAWARE_GDISCALED) == DPI_AWARENESS_CONTEXT.NULL) return;
+    // Fixed: Passing raw isize via @intFromEnum to prevent layout calculation crash
+    if (SetThreadDpiAwarenessContext(@intFromEnum(DPI_AWARENESS_CONTEXT.UNAWARE_GDISCALED)) == @intFromEnum(DPI_AWARENESS_CONTEXT.NULL)) return;
 
     const hwndTray = CreateDialogParamA(null, "CFGDLG", null, @ptrCast(&trayProc), 0) orelse return;
 
@@ -192,9 +193,10 @@ fn menu(hwnd: HWND, uid: u16, x: i16, y: i16) void {
     _ = Shell_NotifyIconGetRect(&.{ .hWnd = hwnd, .uID = uid }, &rect);
     _ = SetForegroundWindow(hwnd);
     
-    _ = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2);
+    // Fixed: Clear enum conversions to plain integers for C-boundary safety
+    _ = SetThreadDpiAwarenessContext(@intFromEnum(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2));
     _ = TrackPopupMenu(hMenu, 0, x, y, 0, hwnd, null);
-    _ = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.NULL);
+    _ = SetThreadDpiAwarenessContext(@intFromEnum(DPI_AWARENESS_CONTEXT.NULL));
 }
 
 fn show(hwnd: HWND) void {
@@ -269,7 +271,8 @@ fn hookMain(_: ?*anyopaque) callconv(.C) u32 {
 fn rawMain(_: ?*anyopaque) callconv(.C) u32 {
     defer _ = PostThreadMessageA(main_thread_id, WM_RAW_STOPPED, 0, 0);
     
-    if (SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2) == DPI_AWARENESS_CONTEXT.NULL) return 0;
+    // Fixed: Explicit int match
+    if (SetThreadDpiAwarenessContext(@intFromEnum(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2)) == @intFromEnum(DPI_AWARENESS_CONTEXT.NULL)) return 0;
     const HWND_MESSAGE: HWND = @ptrFromInt(~@as(usize, 2));
     const hwnd = CreateWindowExA(0, "Message", null, 0, 0, 0, 0, 0, HWND_MESSAGE, null, null, null) orelse return 0;
     defer _ = DestroyWindow(hwnd);
@@ -455,7 +458,6 @@ const State = struct {
     }
 };
 
-// Fixed missing parameter names in extern signatures to prevent parsing/type matching errors
 extern "kernel32" fn CreateMutexA(lpMutexAttributes: ?*const SECURITY_ATTRIBUTES, bInitialOwner: i32, lpName: [*:0]const u8) callconv(.C) ?*anyopaque;
 extern "kernel32" fn GetModuleFileNameA(hModule: ?HMODULE, lpFilename: [*]u8, nSize: u32) callconv(.C) u32;
 extern "kernel32" fn LoadLibraryA(lpLibFileName: [*:0]const u8) callconv(.C) ?HMODULE;
@@ -499,7 +501,10 @@ extern "user32" fn KillTimer(hWnd: ?HWND, uIDEvent: usize) callconv(.C) i32;
 extern "user32" fn GetClipCursor(lprc: *[4]i32) callconv(.C) i32;
 extern "user32" fn GetCursorPos(lpPoint: *[4]i32) callconv(.C) i32;
 extern "user32" fn ClipCursor(lprc: ?*const [4]i32) callconv(.C) i32;
-extern "user32" fn SetThreadDpiAwarenessContext(dpiContext: DPI_AWARENESS_CONTEXT) callconv(.C) DPI_AWARENESS_CONTEXT;
+
+// Fixed: Swapped the DPI_AWARENESS_CONTEXT enum out for standard isize to avoid layout mismatch flags in callconv(.C)
+extern "user32" fn SetThreadDpiAwarenessContext(dpiContext: isize) callconv(.C) isize;
+
 extern "user32" fn CreateDialogParamA(hInstance: ?HMODULE, lpTemplateName: [*:0]const u8, hWndParent: ?HWND, lpDialogFunc: ?DLGPROC, dwInitParam: isize) callconv(.C) ?HWND;
 extern "user32" fn GetDlgItem(hDlg: ?HWND, nIDDlgItem: i32) callconv(.C) ?HWND;
 extern "user32" fn SetDlgItemInt(hDlg: HWND, nIDDlgItem: i32, uValue: u32, bSigned: i32) callconv(.C) i32;
