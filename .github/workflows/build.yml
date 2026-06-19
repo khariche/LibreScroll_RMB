@@ -22,16 +22,10 @@ jobs:
 
     - name: Compile LibreScroll
       run: |
-        zig build -Doptimize=ReleaseSmall
-
-    - name: List Files (Debug)
-      run: |
-        dir
-        dir zig-out
-        dir zig-out\bin
+        zig build-exe main.zig main.rc main.manifest --subsystem windows -O ReleaseSmall -femit-bin=LibreScroll.exe
 
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
         name: LibreScroll-Executable
-        path: zig-out/bin/LibreScroll.exe
+        path: LibreScroll.exe
