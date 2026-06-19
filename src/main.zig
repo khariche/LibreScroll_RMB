@@ -30,7 +30,6 @@ pub fn main() void {
     if (0 != GetLastError()) return;
     main_thread_id = GetCurrentThreadId();
 
-    // Fixed: Explicitly typed parameter to stop the enum literal evaluation bug
     if (SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.UNAWARE_GDISCALED) == DPI_AWARENESS_CONTEXT.NULL) return;
 
     const hwndTray = CreateDialogParamA(null, "CFGDLG", null, @ptrCast(&trayProc), 0) orelse return;
@@ -193,7 +192,6 @@ fn menu(hwnd: HWND, uid: u16, x: i16, y: i16) void {
     _ = Shell_NotifyIconGetRect(&.{ .hWnd = hwnd, .uID = uid }, &rect);
     _ = SetForegroundWindow(hwnd);
     
-    // Fixed: Explicit parameter context typing here too
     _ = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2);
     _ = TrackPopupMenu(hMenu, 0, x, y, 0, hwnd, null);
     _ = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.NULL);
@@ -271,7 +269,6 @@ fn hookMain(_: ?*anyopaque) callconv(.C) u32 {
 fn rawMain(_: ?*anyopaque) callconv(.C) u32 {
     defer _ = PostThreadMessageA(main_thread_id, WM_RAW_STOPPED, 0, 0);
     
-    // Fixed: Explicit parameter typing
     if (SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2) == DPI_AWARENESS_CONTEXT.NULL) return 0;
     const HWND_MESSAGE: HWND = @ptrFromInt(~@as(usize, 2));
     const hwnd = CreateWindowExA(0, "Message", null, 0, 0, 0, 0, 0, HWND_MESSAGE, null, null, null) orelse return 0;
@@ -458,62 +455,63 @@ const State = struct {
     }
 };
 
-extern "kernel32" fn CreateMutexA(?*const SECURITY_ATTRIBUTES, i32, [*:0]const u8) callconv(.C) ?*anyopaque;
-extern "kernel32" fn GetModuleFileNameA(?HMODULE, [*]u8, u32) callconv(.C) u32;
-extern "kernel32" fn LoadLibraryA([*:0]const u8) callconv(.C) ?HMODULE;
-extern "kernel32" fn FreeLibrary(HMODULE) callconv(.C) i32;
-extern "kernel32" fn GetPrivateProfileIntA([*:0]const u8, [*:0]const u8, i32, [*:0]const u8) callconv(.C) i32;
-extern "kernel32" fn WritePrivateProfileStringA([*:0]const u8, [*:0]const u8, [*:0]const u8, [*:0]const u8) callconv(.C) i32;
-extern "kernel32" fn SetThreadPriority(*const anyopaque, i32) callconv(.C) i32;
-extern "kernel32" fn CreateThread(?*const SECURITY_ATTRIBUTES, usize, THREADPROC, ?*anyopaque, u32, ?*u32) callconv(.C) ?*anyopaque;
+// Fixed missing parameter names in extern signatures to prevent parsing/type matching errors
+extern "kernel32" fn CreateMutexA(lpMutexAttributes: ?*const SECURITY_ATTRIBUTES, bInitialOwner: i32, lpName: [*:0]const u8) callconv(.C) ?*anyopaque;
+extern "kernel32" fn GetModuleFileNameA(hModule: ?HMODULE, lpFilename: [*]u8, nSize: u32) callconv(.C) u32;
+extern "kernel32" fn LoadLibraryA(lpLibFileName: [*:0]const u8) callconv(.C) ?HMODULE;
+extern "kernel32" fn FreeLibrary(hLibModule: HMODULE) callconv(.C) i32;
+extern "kernel32" fn GetPrivateProfileIntA(lpAppName: [*:0]const u8, lpKeyName: [*:0]const u8, nDefault: i32, lpFileName: [*:0]const u8) callconv(.C) i32;
+extern "kernel32" fn WritePrivateProfileStringA(lpAppName: [*:0]const u8, lpKeyName: [*:0]const u8, lpString: [*:0]const u8, lpFileName: [*:0]const u8) callconv(.C) i32;
+extern "kernel32" fn SetThreadPriority(hThread: *const anyopaque, nPriority: i32) callconv(.C) i32;
+extern "kernel32" fn CreateThread(lpThreadAttributes: ?*const SECURITY_ATTRIBUTES, dwStackSize: usize, lpStartAddress: THREADPROC, lpParameter: ?*anyopaque, dwCreationFlags: u32, lpThreadId: ?*u32) callconv(.C) ?*anyopaque;
 extern "kernel32" fn GetLastError() callconv(.C) u32;
 extern "kernel32" fn GetCurrentThreadId() callconv(.C) u32;
-extern "kernel32" fn CloseHandle(*const anyopaque) callconv(.C) i32;
-extern "kernel32" fn QueryPerformanceCounter(*i64) callconv(.C) i32;
-extern "kernel32" fn QueryPerformanceFrequency(*i64) callconv(.C) i32;
+extern "kernel32" fn CloseHandle(hObject: *const anyopaque) callconv(.C) i32;
+extern "kernel32" fn QueryPerformanceCounter(lpPerformanceCount: *i64) callconv(.C) i32;
+extern "kernel32" fn QueryPerformanceFrequency(lpFrequency: *i64) callconv(.C) i32;
 
-extern "user32" fn GetWindowLongPtrA(HWND, i32) callconv(.C) isize;
-extern "user32" fn SetWindowLongPtrA(HWND, i32, isize) callconv(.C) isize;
-extern "user32" fn SetWindowLongA(HWND, i32, i32) callconv(.C) i32;
-extern "user32" fn SetWindowTextA(HWND, ?[*:0]const u8) callconv(.C) i32;
-extern "user32" fn CreateWindowExA(u32, ?[*:0]const u8, ?[*:0]const u8, u32, i32, i32, i32, i32, ?HWND, ?HMENU, ?HMODULE, ?*anyopaque) callconv(.C) ?HWND;
-extern "user32" fn DestroyWindow(HWND) callconv(.C) i32;
-extern "user32" fn ShowWindowAsync(HWND, i32) callconv(.C) i32;
-extern "user32" fn IsWindowVisible(HWND) callconv(.C) i32;
-extern "user32" fn PostQuitMessage(i32) callconv(.C) void;
-extern "user32" fn PostThreadMessageA(u32, u32, usize, isize) callconv(.C) i32;
-extern "user32" fn SendMessageA(HWND, u32, usize, isize) callconv(.C) i32;
-extern "user32" fn GetMessageA(*MSG, ?HWND, u32, u32) callconv(.C) i32;
-extern "user32" fn DispatchMessageA(*const MSG) callconv(.C) isize;
-extern "user32" fn TranslateMessage(*const MSG) callconv(.C) i32;
-extern "user32" fn RegisterRawInputDevices([*]const RAWINPUTDEVICE, u32, u32) i32;
-extern "user32" fn GetRawInputData(isize, u32, ?*anyopaque, *u32, u32) callconv(.C) i32;
+extern "user32" fn GetWindowLongPtrA(hWnd: HWND, nIndex: i32) callconv(.C) isize;
+extern "user32" fn SetWindowLongPtrA(hWnd: HWND, nIndex: i32, dwNewLong: isize) callconv(.C) isize;
+extern "user32" fn SetWindowLongA(hWnd: HWND, nIndex: i32, dwNewLong: i32) callconv(.C) i32;
+extern "user32" fn SetWindowTextA(hWnd: HWND, lpString: ?[*:0]const u8) callconv(.C) i32;
+extern "user32" fn CreateWindowExA(dwExStyle: u32, lpClassName: ?[*:0]const u8, lpWindowName: ?[*:0]const u8, dwStyle: u32, X: i32, Y: i32, nWidth: i32, nHeight: i32, hWndParent: ?HWND, hMenu: ?HMENU, hInstance: ?HMODULE, lpParam: ?*anyopaque) callconv(.C) ?HWND;
+extern "user32" fn DestroyWindow(hWnd: HWND) callconv(.C) i32;
+extern "user32" fn ShowWindowAsync(hWnd: HWND, nCmdShow: i32) callconv(.C) i32;
+extern "user32" fn IsWindowVisible(hWnd: HWND) callconv(.C) i32;
+extern "user32" fn PostQuitMessage(nExitCode: i32) callconv(.C) void;
+extern "user32" fn PostThreadMessageA(idThread: u32, Msg: u32, wParam: usize, lParam: isize) callconv(.C) i32;
+extern "user32" fn SendMessageA(hWnd: HWND, Msg: u32, wParam: usize, lParam: isize) callconv(.C) i32;
+extern "user32" fn GetMessageA(lpMsg: *MSG, hWnd: ?HWND, wMsgFilterMin: u32, wMsgFilterMax: u32) callconv(.C) i32;
+extern "user32" fn DispatchMessageA(lpMsg: *const MSG) callconv(.C) isize;
+extern "user32" fn TranslateMessage(lpMsg: *const MSG) callconv(.C) i32;
+extern "user32" fn RegisterRawInputDevices(pRawInputDevices: [*]const RAWINPUTDEVICE, uiNumDevices: u32, cbSize: u32) i32;
+extern "user32" fn GetRawInputData(hRawInput: isize, uiCommand: u32, pData: ?*anyopaque, pcbSize: *u32, cbSizeHeader: u32) callconv(.C) i32;
 extern "user32" fn SendInput(cInputs: u32, pInputs: [*]const INPUT, cbSize: i32) callconv(.C) u32;
-extern "user32" fn LoadIconA(?HMODULE, [*:0]const u8) callconv(.C) ?HICON;
-extern "user32" fn LoadMenuA(?HMODULE, [*:0]const u8) callconv(.C) ?HMENU;
-extern "user32" fn DestroyMenu(HMENU) callconv(.C) i32;
-extern "user32" fn TrackPopupMenu(HMENU, u32, i32, i32, i32, ?HWND, ?*const [4]i32) callconv(.C) u32;
-extern "user32" fn SetForegroundWindow(HWND) callconv(.C) i32;
-extern "user32" fn GetSubMenu(HMENU, i32) callconv(.C) ?HMENU;
-extern "user32" fn MessageBoxA(?HWND, ?[*:0]const u8, ?[*:0]const u8, u32) callconv(.C) i32;
-extern "user32" fn SetTimer(?HWND, usize, u32, ?TIMERPROC) callconv(.C) usize;
-extern "user32" fn KillTimer(?HWND, usize) callconv(.C) i32;
-extern "user32" fn GetClipCursor(*[4]i32) callconv(.C) i32;
-extern "user32" fn GetCursorPos(*[4]i32) callconv(.C) i32;
-extern "user32" fn ClipCursor(?*const [4]i32) callconv(.C) i32;
-extern "user32" fn SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT) callconv(.C) DPI_AWARENESS_CONTEXT;
-extern "user32" fn CreateDialogParamA(?HMODULE, [*:0]const u8, ?HWND, ?DLGPROC, isize) callconv(.C) ?HWND;
-extern "user32" fn GetDlgItem(?HWND, i32) callconv(.C) ?HWND;
-extern "user32" fn SetDlgItemInt(HWND, i32, u32, i32) callconv(.C) i32;
-extern "user32" fn GetDlgItemInt(HWND, i32, ?*i32, i32) callconv(.C) u32;
-extern "user32" fn GetDlgItemTextA(HWND, i32, [*:0]u8, i32) callconv(.C) u32;
-extern "user32" fn IsDialogMessageA(HWND, *MSG) callconv(.C) i32;
-extern "user32" fn IsDlgButtonChecked(HWND, i32) callconv(.C) u32;
-extern "user32" fn CheckDlgButton(HWND, i32, u32) callconv(.C) i32;
-extern "user32" fn SetWindowsHookExA(i32, HOOKPROC, ?HMODULE, u32) callconv(.C) ?HHOOK;
-extern "user32" fn UnhookWindowsHookEx(HHOOK) callconv(.C) i32;
-extern "user32" fn CallNextHookEx(?HHOOK, i32, usize, isize) callconv(.C) isize;
-extern "user32" fn CallWindowProcA(WNDPROC, HWND, u32, usize, isize) callconv(.C) isize;
+extern "user32" fn LoadIconA(hInstance: ?HMODULE, lpIconName: [*:0]const u8) callconv(.C) ?HICON;
+extern "user32" fn LoadMenuA(hInstance: ?HMODULE, lpMenuName: [*:0]const u8) callconv(.C) ?HMENU;
+extern "user32" fn DestroyMenu(hMenu: HMENU) callconv(.C) i32;
+extern "user32" fn TrackPopupMenu(hMenu: HMENU, uFlags: u32, x: i32, y: i32, nReserved: i32, hWnd: ?HWND, prcRect: ?*const [4]i32) callconv(.C) u32;
+extern "user32" fn SetForegroundWindow(hWnd: HWND) callconv(.C) i32;
+extern "user32" fn GetSubMenu(hMenu: HMENU, nPos: i32) callconv(.C) ?HMENU;
+extern "user32" fn MessageBoxA(hWnd: ?HWND, lpText: ?[*:0]const u8, lpCaption: ?[*:0]const u8, uType: u32) callconv(.C) i32;
+extern "user32" fn SetTimer(hWnd: ?HWND, nIDEvent: usize, uElapse: u32, lpTimerFunc: ?TIMERPROC) callconv(.C) usize;
+extern "user32" fn KillTimer(hWnd: ?HWND, uIDEvent: usize) callconv(.C) i32;
+extern "user32" fn GetClipCursor(lprc: *[4]i32) callconv(.C) i32;
+extern "user32" fn GetCursorPos(lpPoint: *[4]i32) callconv(.C) i32;
+extern "user32" fn ClipCursor(lprc: ?*const [4]i32) callconv(.C) i32;
+extern "user32" fn SetThreadDpiAwarenessContext(dpiContext: DPI_AWARENESS_CONTEXT) callconv(.C) DPI_AWARENESS_CONTEXT;
+extern "user32" fn CreateDialogParamA(hInstance: ?HMODULE, lpTemplateName: [*:0]const u8, hWndParent: ?HWND, lpDialogFunc: ?DLGPROC, dwInitParam: isize) callconv(.C) ?HWND;
+extern "user32" fn GetDlgItem(hDlg: ?HWND, nIDDlgItem: i32) callconv(.C) ?HWND;
+extern "user32" fn SetDlgItemInt(hDlg: HWND, nIDDlgItem: i32, uValue: u32, bSigned: i32) callconv(.C) i32;
+extern "user32" fn GetDlgItemInt(hDlg: HWND, nIDDlgItem: i32, lpTranslated: ?*i32, bSigned: i32) callconv(.C) u32;
+extern "user32" fn GetDlgItemTextA(hDlg: HWND, nIDDlgItem: i32, lpString: [*:0]u8, cchMax: i32) callconv(.C) u32;
+extern "user32" fn IsDialogMessageA(hDlg: HWND, lpMsg: *MSG) callconv(.C) i32;
+extern "user32" fn IsDlgButtonChecked(hDlg: HWND, nIDButton: i32) callconv(.C) u32;
+extern "user32" fn CheckDlgButton(hDlg: HWND, nIDButton: i32, uCheck: u32) callconv(.C) i32;
+extern "user32" fn SetWindowsHookExA(idHook: i32, lpfn: HOOKPROC, hmod: ?HMODULE, dwThreadId: u32) callconv(.C) ?HHOOK;
+extern "user32" fn UnhookWindowsHookEx(hhk: HHOOK) callconv(.C) i32;
+extern "user32" fn CallNextHookEx(hhk: ?HHOOK, nCode: i32, wParam: usize, lParam: isize) callconv(.C) isize;
+extern "user32" fn CallWindowProcA(lpPrevWndFunc: WNDPROC, hWnd: HWND, Msg: u32, wParam: usize, lParam: isize) callconv(.C) isize;
 
 const DPI_AWARENESS_CONTEXT = enum(isize) {
     NULL = 0,
@@ -524,11 +522,11 @@ const DPI_AWARENESS_CONTEXT = enum(isize) {
     UNAWARE_GDISCALED = -5,
 };
 
-const WNDPROC = *const fn (HWND, u32, usize, isize) callconv(.C) isize;
-const DLGPROC = *const fn (HWND, u32, usize, isize) callconv(.C) isize;
-const HOOKPROC = *const fn (i32, usize, isize) callconv(.C) isize;
-const TIMERPROC = *const fn (?HWND, u32, usize, u32) callconv(.C) void;
-const THREADPROC = *const fn (*anyopaque) callconv(.C) u32;
+const WNDPROC = *const fn (hWnd: HWND, Msg: u32, wParam: usize, lParam: isize) callconv(.C) isize;
+const DLGPROC = *const fn (hWnd: HWND, Msg: u32, wParam: usize, lParam: isize) callconv(.C) isize;
+const HOOKPROC = *const fn (nCode: i32, wParam: usize, lParam: isize) callconv(.C) isize;
+const TIMERPROC = *const fn (hWnd: ?HWND, uMsg: u32, idEvent: usize, dwTime: u32) callconv(.C) void;
+const THREADPROC = *const fn (lpParameter: *anyopaque) callconv(.C) u32;
 
 const HHOOK = *const opaque{};
 const MSLLHOOKSTRUCT = extern struct {
@@ -638,9 +636,9 @@ const INPUT = extern struct {
 };
 
 extern "shell32" fn IsUserAnAdmin() callconv(.C) i32;
-extern "shell32" fn ShellExecuteA(?HWND, ?[*:0]const u8, [*:0]const u8, ?[*:0]const u8, ?[*:0]const u8, i32) callconv(.C) ?HMODULE;
-extern "shell32" fn Shell_NotifyIconGetRect(*const NOTIFYICONIDENTIFIER, *[4]i32) callconv(.C) i32;
-extern "shell32" fn Shell_NotifyIconA(NIM, *const NOTIFYICONDATAA) callconv(.C) i32;
+extern "shell32" fn ShellExecuteA(hwnd: ?HWND, lpOperation: ?[*:0]const u8, lpFile: [*:0]const u8, lpParameters: ?[*:0]const u8, lpDirectory: ?[*:0]const u8, nShowCmd: i32) callconv(.C) ?HMODULE;
+extern "shell32" fn Shell_NotifyIconGetRect(identifier: *const NOTIFYICONIDENTIFIER, iconLocation: *[4]i32) callconv(.C) i32;
+extern "shell32" fn Shell_NotifyIconA(dwMessage: NIM, lpData: *const NOTIFYICONDATAA) callconv(.C) i32;
 const NIM = enum(u32) {
     ADD = 0,
     MODIFY = 1,
