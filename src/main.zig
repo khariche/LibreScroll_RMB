@@ -30,8 +30,7 @@ pub fn main() void {
     if (0 != GetLastError()) return;
     main_thread_id = GetCurrentThreadId();
 
-    // Fixed: Passing raw isize via @intFromEnum to prevent layout calculation crash
-    if (SetThreadDpiAwarenessContext(@intFromEnum(DPI_AWARENESS_CONTEXT.UNAWARE_GDISCALED)) == @intFromEnum(DPI_AWARENESS_CONTEXT.NULL)) return;
+    if (SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.UNAWARE_GDISCALED) == DPI_AWARENESS_CONTEXT.NULL) return;
 
     const hwndTray = CreateDialogParamA(null, "CFGDLG", null, @ptrCast(&trayProc), 0) orelse return;
 
@@ -193,10 +192,9 @@ fn menu(hwnd: HWND, uid: u16, x: i16, y: i16) void {
     _ = Shell_NotifyIconGetRect(&.{ .hWnd = hwnd, .uID = uid }, &rect);
     _ = SetForegroundWindow(hwnd);
     
-    // Fixed: Clear enum conversions to plain integers for C-boundary safety
-    _ = SetThreadDpiAwarenessContext(@intFromEnum(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2));
+    _ = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2);
     _ = TrackPopupMenu(hMenu, 0, x, y, 0, hwnd, null);
-    _ = SetThreadDpiAwarenessContext(@intFromEnum(DPI_AWARENESS_CONTEXT.NULL));
+    _ = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.NULL);
 }
 
 fn show(hwnd: HWND) void {
@@ -271,8 +269,7 @@ fn hookMain(_: ?*anyopaque) callconv(.C) u32 {
 fn rawMain(_: ?*anyopaque) callconv(.C) u32 {
     defer _ = PostThreadMessageA(main_thread_id, WM_RAW_STOPPED, 0, 0);
     
-    // Fixed: Explicit int match
-    if (SetThreadDpiAwarenessContext(@intFromEnum(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2)) == @intFromEnum(DPI_AWARENESS_CONTEXT.NULL)) return 0;
+    if (SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT.PER_MONITOR_AWARE_V2) == DPI_AWARENESS_CONTEXT.NULL) return 0;
     const HWND_MESSAGE: HWND = @ptrFromInt(~@as(usize, 2));
     const hwnd = CreateWindowExA(0, "Message", null, 0, 0, 0, 0, 0, HWND_MESSAGE, null, null, null) orelse return 0;
     defer _ = DestroyWindow(hwnd);
@@ -355,8 +352,9 @@ fn rawMain(_: ?*anyopaque) callconv(.C) u32 {
 
                 if (!did_move) {
                     _ = INPUT.send(&.{
-                        .mi(.{ .dwFlags = 0x0008, .dwExtraInfo = @bitCast(MAGIC_WORD) }),
-                        .mi(.{ .dwFlags = 0x0010, .dwExtraInfo = @bitCast(MAGIC_WORD) }),
+                        // FIX: Explicitly namespace the calls to prevent parsing as an enum literal
+                        INPUT.mi(.{ .dwFlags = 0x0008, .dwExtraInfo = @bitCast(MAGIC_WORD) }),
+                        INPUT.mi(.{ .dwFlags = 0x0010, .dwExtraInfo = @bitCast(MAGIC_WORD) }),
                     });
                 }
             } else if (4 == 4 & flags) {
@@ -446,8 +444,9 @@ const State = struct {
         }
         if (0 == send[0] and 0 == send[1]) return;
         const buf: [2]INPUT = .{
-            .mi(.{ .mouseData = -send[1], .dwFlags = 0x0800 }),
-            .mi(.{ .mouseData =  send[0], .dwFlags = 0x1000 }),
+            // FIX: Explicitly namespace these calls as well
+            INPUT.mi(.{ .mouseData = -send[1], .dwFlags = 0x0800 }),
+            INPUT.mi(.{ .mouseData =  send[0], .dwFlags = 0x1000 }),
         };
         state.scroll_pending = false;
         if (send[1] != 0) {
@@ -502,8 +501,8 @@ extern "user32" fn GetClipCursor(lprc: *[4]i32) callconv(.C) i32;
 extern "user32" fn GetCursorPos(lpPoint: *[4]i32) callconv(.C) i32;
 extern "user32" fn ClipCursor(lprc: ?*const [4]i32) callconv(.C) i32;
 
-// Fixed: Swapped the DPI_AWARENESS_CONTEXT enum out for standard isize to avoid layout mismatch flags in callconv(.C)
-extern "user32" fn SetThreadDpiAwarenessContext(dpiContext: isize) callconv(.C) isize;
+// Reverted to DPI_AWARENESS_CONTEXT as it wasn't the actual issue
+extern "user32" fn SetThreadDpiAwarenessContext(dpiContext: DPI_AWARENESS_CONTEXT) callconv(.C) DPI_AWARENESS_CONTEXT;
 
 extern "user32" fn CreateDialogParamA(hInstance: ?HMODULE, lpTemplateName: [*:0]const u8, hWndParent: ?HWND, lpDialogFunc: ?DLGPROC, dwInitParam: isize) callconv(.C) ?HWND;
 extern "user32" fn GetDlgItem(hDlg: ?HWND, nIDDlgItem: i32) callconv(.C) ?HWND;
