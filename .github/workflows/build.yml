@@ -1,0 +1,23 @@
+name: Build LibreScroll
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.11.0
+
+      - name: Compile Windows Binary
+        run: zig build-exe main.zig main.rc main.manifest --subsystem windows -O ReleaseSmall
+
+      - name: Upload Finished EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Custom-LibreScroll
+          path: main.exe
